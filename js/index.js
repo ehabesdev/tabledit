@@ -39,6 +39,57 @@ function updateSelectionInfo(message) {
     }
 }
 
+function printTableOnly() {
+    const wasMultiDeleteActive = isMultiDeleteModeActive;
+    if (wasMultiDeleteActive) hideRowCheckboxes();
+    const printWindow = window.open('', '_blank');
+    const tableHtml = document.querySelector('.table-container').innerHTML;
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Tablo Yazdırma</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 20px;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    font-size: 12px;
+                }
+                th, td { 
+                    border: 1px solid #000; 
+                    padding: 8px; 
+                    text-align: left;
+                }
+                th { 
+                    background-color: #f0f0f0; 
+                    font-weight: bold;
+                }
+                .editable {
+                    border: none;
+                    background: transparent;
+                    width: 100%;
+                    font-size: inherit;
+                    font-family: inherit;
+                }
+            </style>
+        </head>
+        <body>
+            <h2>Tablo Raporu</h2>
+            <div>${tableHtml}</div>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.print();
+    if (wasMultiDeleteActive) showRowCheckboxes();
+}
+
 function selectCell(cell, event) {
     if (event) {
         event.stopPropagation();
@@ -293,7 +344,7 @@ function addRow() {
         }
 
         if (i === 0 && actualDataHeaderCell && (actualDataHeaderCell.textContent.toLowerCase().includes('id') || actualDataHeaderCell.textContent.toLowerCase().includes('sıra no'))) {
-            cellValue = (tbody.rows.length).toString().padStart(3, '0');
+            cellValue = (tbody.rows.length).toString().padStart(1, '0');
             cell.innerHTML = `<input type="text" class="editable" value="${cellValue}" readonly>`;
         } else {
             cell.innerHTML = `<input type="text" class="editable" value="">`;
@@ -717,7 +768,7 @@ async function exportToExcelAdvanced() {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorToARGB(style.bg) } };
                 }
                 cell.alignment = { vertical: 'middle', wrapText: true };
-                cell.border = { /* ... (sınır stilleri aynı kalabilir) ... */
+                cell.border = {
                     top: { style: 'thin', color: { argb: 'FFBFBFBF' } }, left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
                     bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } }, right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
                 };
