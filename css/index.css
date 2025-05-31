@@ -6,7 +6,7 @@
 
   body {
       font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background-image: url('img/bg_agd.png');
+      background-image: url('../img/bg_agd.png');
       background-repeat: no-repeat;
       background-size: cover;
       background-position: center center;
