@@ -64,19 +64,6 @@ open index.html
 
 ---
 
-## 📁 Proje Yapısı
-
-```
-tabledit/
-├── 🏠 index.html          # Ana tablo editörü
-├── 🔄 converter.html      # Excel → JSON dönüştürücü
-├── 📁 img/
-│   └── 🖼️ bg_agd.png      # Arkaplan resmi
-└── 📖 README.md
-```
-
----
-
 ## 📖 Kullanım Kılavuzu
 
 ### 1️⃣ **Temel Düzenleme**
