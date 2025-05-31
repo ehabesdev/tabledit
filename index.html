@@ -477,7 +477,7 @@
                 <button class="btn btn-warning" onclick="saveTable()">💾 Kaydet</button>
                 <button class="btn btn-warning" onclick="loadTable()">📂 Yükle</button>
                 <button class="btn btn-danger" onclick="clearTable()">🗑️ Temizle</button>
-                <button class="btn" onclick="excelToJson()"> 📄 JSON Dönüştür</button>
+                <button class="btn" onclick="converter()"> 📄 JSON Dönüştür</button>
             </div>
 
             <div class="selection-info" id="selectionInfo">
@@ -627,9 +627,9 @@
         const CHECKBOX_COLUMN_CLASS = 'row-checkbox-cell';
 
 
-        function excelToJson()
+        function converter()
         {
-            window.location.href = 'excel_to_json.html';
+            window.location.href = 'converter.html';
         }
 
         function updateFixedElementLayout() {
