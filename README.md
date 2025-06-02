@@ -135,7 +135,7 @@ tabledit/
 ├── css/
 │   └── index.css       # Stil dosyası
 ├── js/
-│   └── index.js        # Ana JavaScript (2000+ satır)
+│   └── index.js        # Ana JavaScript
 ├── img/
 │   ├── agd_logo.png    # Logo dosyası
 │   ├── favicon.png     # Favicon
