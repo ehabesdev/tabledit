@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="tr">
 
 <head>
@@ -8,58 +9,143 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="js/index.js"></script>
-      <link rel="icon" type="image/png" href="img/favicon.png">
+    <link rel="icon" type="image/png" href="img/favicon.png">
 </head>
 
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Anadolu Gençlik Derneği</h1>
-            <p>Dinamik Tablo Editörü ve Excel Export Sistemi</p>
+        <div class="top-sticky-section">
+            <div class="header">
+                <img src="img/logo.png" alt="Firma Logosu" class="header-logo">
+            </div>
+            <div class="navbar">
+                <div class="nav-menu">
+                    <button class="nav-button" onclick="toggleMenu('dosyaMenu')">Dosya</button>
+                    <div class="dropdown-menu" id="dosyaMenu">
+                        <button class="menu-item" onclick="saveTableAsExcel()">
+                            <span class="icon">💾</span>
+                            <span class="text">Kaydet</span>
+                            <span class="shortcut">Ctrl+S</span>
+                        </button>
+                        <button class="menu-item" onclick="loadTableFromExcel()">
+                            <span class="icon">📂</span>
+                            <span class="text">Aç</span>
+                            <span class="shortcut">Ctrl+O</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-item" onclick="exportToExcelBasic()">
+                            <span class="icon">📊</span>
+                            <span class="text">Basit Excel Olarak Dışa Aktar</span>
+                        </button>
+                        <button class="menu-item" onclick="exportToExcelAdvanced()">
+                            <span class="icon">🎨</span>
+                            <span class="text">Formatlı Excel Olarak Dışa Aktar</span>
+                        </button>
+                        <button class="menu-item" onclick="exportToCSV()">
+                            <span class="icon">📄</span>
+                            <span class="text">CSV Olarak Dışa Aktar</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-item" onclick="printTableOnly()">
+                            <span class="icon">🖨️</span>
+                            <span class="text">Yazdır</span>
+                            <span class="shortcut">Ctrl+P</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="nav-menu">
+                    <button class="nav-button" onclick="toggleMenu('duzenleMenu')">Düzenle</button>
+                    <div class="dropdown-menu" id="duzenleMenu">
+                        <button class="menu-item" onclick="addRow()">
+                            <span class="icon">➕</span>
+                            <span class="text">Satır Ekle</span>
+                        </button>
+                        <button class="menu-item" onclick="addColumn()">
+                            <span class="icon">➕</span>
+                            <span class="text">Sütun Ekle</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-item" onclick="deleteSelectedRow()">
+                            <span class="icon">🗑️</span>
+                            <span class="text">Seçili Satırı Sil</span>
+                        </button>
+                        <button class="menu-item" onclick="deleteSelectedColumn()">
+                            <span class="icon">🗑️</span>
+                            <span class="text">Seçili Sütunu Sil</span>
+                        </button>
+                        <button class="menu-item" onclick="toggleMultiDeleteMode()">
+                            <span class="icon">🔪</span>
+                            <span class="text">Çoklu Silme Modu</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-item" onclick="clearTable()">
+                            <span class="icon">🗑️</span>
+                            <span class="text">Tabloyu Temizle</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="nav-menu">
+                    <button class="nav-button" onclick="toggleMenu('bicimlendirMenu')">Biçimlendirme</button>
+                    <div class="dropdown-menu" id="bicimlendirMenu">
+                        <button class="menu-item" onclick="showColorPalette('bg')">
+                            <span class="icon">🎨</span>
+                            <span class="text">Arka Plan Rengi</span>
+                        </button>
+                        <button class="menu-item" onclick="showColorPalette('text')">
+                            <span class="icon">✏️</span>
+                            <span class="text">Yazı Rengi</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-item" onclick="clearCellFormat()">
+                            <span class="icon">🗑️</span>
+                            <span class="text">Biçimlendirmeyi Temizle</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="nav-menu">
+                    <button class="nav-button" onclick="toggleMenu('gorunumMenu')">Görünüm</button>
+                    <div class="dropdown-menu" id="gorunumMenu">
+                        <button class="menu-item" onclick="clearSelection()">
+                            <span class="icon">❌</span>
+                            <span class="text">Seçimi Kaldır</span>
+                        </button>
+                        <button class="menu-item" onclick="toggleStatsPanel()">
+                            <span class="icon">📊</span>
+                            <span class="text">İstatistik Paneli</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="quick-toolbar">
+                <button class="quick-btn" onclick="saveTableAsExcel()" title="Kaydet">💾</button>
+                <button class="quick-btn" onclick="loadTableFromExcel()" title="Aç">📂</button>
+                <div class="toolbar-separator"></div>
+                <button class="quick-btn" onclick="addRow()" title="Satır Ekle">➕</button>
+                <button class="quick-btn" onclick="deleteSelectedRow()" title="Satır Sil">🗑️</button>
+                <div class="toolbar-separator"></div>
+                <button class="quick-btn" onclick="showColorPalette('bg')" title="Arka Plan Rengi">🎨</button>
+                <button class="quick-btn" onclick="showColorPalette('text')" title="Yazı Rengi">✏️</button>
+                <button class="quick-btn" onclick="clearSelection('text')" title="Seçimi Kaldır">❌</button>
+                <div class="toolbar-separator"></div>
+                <button class="quick-btn" onclick="printTableOnly()" title="Yazdır">🖨️</button>
+
+                <div class="selection-info" id="selectionInfo">
+                    <span id="selectionText">Seçim yapılmadı</span>
+                </div>
+            </div>
+            <div class="multi-delete-toolbar" id="multiDeleteToolbar" style="display: none;">
+                <button class="btn btn-success" id="confirmDeleteSelectedBtn" onclick="confirmDeleteSelectedRows()">
+                    ✔️ Seçilenleri Sil
+                </button>
+                <button class="btn btn-danger" onclick="toggleMultiDeleteMode()">
+                    ✖️ İptal
+                </button>
+            </div>
         </div>
-        <div class="toolbar">
-            <div class="btn-group">
-                <button class="btn btn-success" id="addRowBtn" onclick="addRow()">➕ Satır Ekle</button>
-                <button class="btn btn-success" id="addColumnBtn" onclick="addColumn()">➕ Sütun Ekle</button>
-                <button class="btn btn-danger" id="singleDeleteRowBtn" onclick="deleteSelectedRow()">🗑️ Tek Satır
-                    Sil</button>
-                <button class="btn btn-info" id="toggleMultiDeleteBtn" onclick="toggleMultiDeleteMode()">🔪 Çoklu
-                    Silme</button>
-                <button class="btn btn-success" id="confirmDeleteSelectedBtn" onclick="confirmDeleteSelectedRows()"
-                    style="display:none;">✔️ Seçilenleri Sil</button>
-                <button class="btn btn-danger" id="deleteColumnBtn" onclick="deleteSelectedColumn()">🗑️ Sütun
-                    Sil</button>
-            </div>
-
-
-            <div class="btn-group">
-                <button class="btn btn-warning" onclick="showColorPalette('bg')">🎨 Arka Plan</button>
-                <button class="btn btn-warning" onclick="showColorPalette('text')">✏️ Yazı Rengi</button>
-                <button class="btn btn-danger" onclick="clearCellFormat()">🗑️ Renk Temizle</button>
-                <button class="btn" onclick="clearSelection()">❌ Seçimi Kaldır</button>
-            </div>
-
-
-            <div class="btn-group">
-                <button class="btn" onclick="exportToExcelBasic()">📊 Basit Excel</button>
-                <button class="btn btn-success" onclick="exportToExcelAdvanced()">🎨 Formatlı Excel</button>
-                <button class="btn" onclick="exportToCSV()">📄 CSV İndir</button>
-                <button class="btn" onclick="printTableOnly()">🖨️ Yazdır</button>
-            </div>
-
-
-            <div class="btn-group">
-                <button class="btn btn-warning" onclick="saveTable()">💾 Kaydet</button>
-                <button class="btn btn-warning" onclick="loadTable()">📂 Yükle</button>
-                <button class="btn btn-danger" onclick="clearTable()">🗑️ Temizle</button>
-                <button class="btn" onclick="converter()"> 📄 JSON Dönüştür</button>
-            </div>
-
-            <div class="selection-info" id="selectionInfo">
-                <span id="selectionText">Seçim yapılmadı</span>
-            </div>
-        </div>
-
         <div class="table-container">
             <table id="dynamicTable">
                 <thead>
@@ -112,7 +198,7 @@
             </table>
         </div>
 
-        <div class="stats">
+        <div class="stats" id="statsPanel">
             <div class="stat-card">
                 <div class="stat-number" id="rowCount">3</div>
                 <div class="stat-label">Toplam Satır</div>
@@ -191,4 +277,5 @@
     </div>
 
 </body>
+
 </html>

@@ -1,5 +1,3 @@
-
-
 let selectedCell = null;
 let selectedRow = null;
 let selectedColumn = null;
@@ -7,24 +5,258 @@ let colorTargetType = '';
 let isMultiDeleteModeActive = false;
 const CHECKBOX_COLUMN_CLASS = 'row-checkbox-cell';
 
-
-function converter() {
-    window.location.href = 'converter.html';
+function toggleMenu(menuId) {
+    const menu = document.getElementById(menuId);
+    const allMenus = document.querySelectorAll('.dropdown-menu');
+    const allButtons = document.querySelectorAll('.nav-button');
+    
+    allMenus.forEach(m => {
+        if (m.id !== menuId) {
+            m.classList.remove('show');
+        }
+    });
+    
+    menu.classList.toggle('show');
+    
+    const button = document.querySelector(`[onclick="toggleMenu('${menuId}')"]`);
+    allButtons.forEach(b => b.classList.remove('active'));
+    if (menu.classList.contains('show')) {
+        button.classList.add('active');
+    }
 }
 
-function updateFixedElementLayout() {
-    const headerElement = document.querySelector('.header');
-    const toolbarElement = document.querySelector('.toolbar');
-    const containerElement = document.querySelector('.container');
-
-    if (headerElement && toolbarElement && containerElement) {
-        const headerHeight = headerElement.offsetHeight;
-        toolbarElement.style.top = headerHeight + 'px';
-
-        const toolbarHeight = toolbarElement.offsetHeight;
-
-        containerElement.style.paddingTop = (headerHeight + toolbarHeight) + 'px';
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.nav-menu')) {
+        document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.classList.remove('show');
+        });
+        document.querySelectorAll('.nav-button').forEach(button => {
+            button.classList.remove('active');
+        });
     }
+});
+
+function toggleStatsPanel() {
+    const statsPanel = document.getElementById('statsPanel');
+    statsPanel.style.display = statsPanel.style.display === 'none' ? 'grid' : 'none';
+}
+
+async function saveTableAsExcel() {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Tablo Verileri');
+    const table = document.getElementById('dynamicTable');
+
+    const headers = [];
+    const headerStyles = [];
+    table.querySelectorAll('thead th').forEach(th => {
+        if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+        headers.push(th.textContent.trim());
+        headerStyles.push({ 
+            bg: th.style.backgroundColor || '#2c3e50', 
+            text: th.style.color || '#ffffff' 
+        });
+    });
+
+    if (headers.length === 0) {
+        alert("Kaydedilecek veri bulunamadı.");
+        return;
+    }
+
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell, colNumber) => {
+        const style = headerStyles[colNumber - 1];
+        cell.fill = { 
+            type: 'pattern', 
+            pattern: 'solid', 
+            fgColor: { argb: colorToARGB(style.bg) } 
+        };
+        cell.font = { 
+            name: 'Calibri', 
+            size: 12, 
+            bold: true, 
+            color: { argb: colorToARGB(style.text) } 
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = {
+            top: { style: 'medium', color: { argb: 'FF000000' } },
+            left: { style: 'medium', color: { argb: 'FF000000' } },
+            bottom: { style: 'medium', color: { argb: 'FF000000' } },
+            right: { style: 'medium', color: { argb: 'FF000000' } }
+        };
+    });
+
+    worksheet.columns = headers.map(() => ({ width: 25 }));
+
+    table.querySelectorAll('tbody tr').forEach(trNode => {
+        const rowData = [];
+        const cellStyles = [];
+        const cellMeta = [];
+        
+        Array.from(trNode.cells).forEach((td, idx) => {
+            if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+            
+            const input = td.querySelector('.editable');
+            rowData.push(input ? input.value.trim() : td.textContent.trim());
+            cellStyles.push({ 
+                bg: td.style.backgroundColor || '#ffffff', 
+                text: td.style.color || '#000000' 
+            });
+            cellMeta.push({
+                readonly: input ? input.readOnly : false
+            });
+        });
+
+        if (rowData.length > 0) {
+            const dataRow = worksheet.addRow(rowData);
+            dataRow.eachCell((cell, colNumber) => {
+                const style = cellStyles[colNumber - 1];
+                const meta = cellMeta[colNumber - 1];
+                
+                cell.font = { 
+                    name: 'Calibri', 
+                    size: 11, 
+                    color: { argb: colorToARGB(style.text) } 
+                };
+                
+                if (style.bg && style.bg !== 'rgb(255, 255, 255)' && style.bg !== '#ffffff' && style.bg !== 'transparent' && style.bg !== '') {
+                    cell.fill = { 
+                        type: 'pattern', 
+                        pattern: 'solid', 
+                        fgColor: { argb: colorToARGB(style.bg) } 
+                    };
+                }
+                
+                cell.alignment = { vertical: 'middle', wrapText: true };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
+                };
+                
+                if (meta.readonly) {
+                    cell.note = "readonly:true";
+                }
+            });
+        }
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Anadolu_Genclik_Tablo_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function loadTableFromExcel() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls';
+    input.onchange = async function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = new ExcelJS.Workbook();
+                    await workbook.xlsx.load(data);
+                    
+                    const worksheet = workbook.worksheets[0];
+                    if (!worksheet) {
+                        alert('Excel dosyasında sayfa bulunamadı.');
+                        return;
+                    }
+                    
+                    if (isMultiDeleteModeActive) {
+                        toggleMultiDeleteMode();
+                    }
+                    
+                    loadExcelData(worksheet);
+                } catch (error) {
+                    alert('Dosya yüklenirken hata oluştu: ' + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    };
+    input.click();
+}
+
+function loadExcelData(worksheet) {
+    const table = document.getElementById('dynamicTable');
+    const theadTr = table.querySelector('thead tr');
+    const tbody = table.querySelector('tbody');
+    
+    theadTr.innerHTML = '';
+    tbody.innerHTML = '';
+    clearSelection();
+    
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell, colNumber) => {
+        const th = document.createElement('th');
+        th.textContent = cell.value || `Sütun ${colNumber}`;
+        
+        if (cell.fill && cell.fill.fgColor) {
+            th.style.backgroundColor = argbToHex(cell.fill.fgColor.argb);
+        } else {
+            th.style.backgroundColor = '#2c3e50';
+        }
+        
+        if (cell.font && cell.font.color) {
+            th.style.color = argbToHex(cell.font.color.argb);
+        } else {
+            th.style.color = 'white';
+        }
+        
+        theadTr.appendChild(th);
+    });
+    
+    for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+        const row = worksheet.getRow(rowNumber);
+        if (row.hasValues) {
+            const tr = tbody.insertRow();
+            tr.onclick = function() { selectRow(this); };
+            tr.style.cursor = 'pointer';
+            
+            row.eachCell((cell, colNumber) => {
+                const td = tr.insertCell();
+                td.onclick = function(event) { selectCell(this, event); };
+                td.style.cursor = 'pointer';
+                
+                const value = cell.value || '';
+                
+                const isReadonly = cell.note && cell.note.includes('readonly:true');
+                
+                td.innerHTML = `<input type="text" class="editable" value="${value}" ${isReadonly ? 'readonly' : ''}>`;
+                
+                if (cell.fill && cell.fill.fgColor) {
+                    td.style.backgroundColor = argbToHex(cell.fill.fgColor.argb);
+                }
+                
+                if (cell.font && cell.font.color) {
+                    td.style.color = argbToHex(cell.font.color.argb);
+                    const input = td.querySelector('.editable');
+                    if (input) {
+                        input.style.color = argbToHex(cell.font.color.argb);
+                    }
+                }
+            });
+        }
+    }
+    
+    updateStats();
+    updateColumnClickEvents();
+    updateRowNumbers();
+}
+
+function argbToHex(argb) {
+    if (!argb) return '#ffffff';
+    const hex = argb.substring(2);
+    return '#' + hex.toLowerCase();
 }
 
 function updateSelectionInfo(message) {
@@ -310,7 +542,6 @@ function addRow() {
         dataColumnCount = 5;
     }
 
-
     if (isMultiDeleteModeActive) {
         const cbCell = newRow.insertCell(0);
         cbCell.classList.add(CHECKBOX_COLUMN_CLASS);
@@ -356,7 +587,6 @@ function addRow() {
     updateRowNumbers();
 }
 
-
 function addColumn() {
     document.getElementById('columnModal').style.display = 'block';
 }
@@ -393,7 +623,6 @@ function confirmAddColumn() {
     updateStats();
     updateColumnClickEvents();
 }
-
 
 function deleteSelectedRow() {
     if (selectedRow && selectedRow.parentNode && selectedRow.parentNode.tagName === 'TBODY') {
@@ -439,7 +668,6 @@ function deleteSelectedColumn() {
             return;
         }
     }
-
 
     const rows = table.querySelectorAll('tr');
     rows.forEach(row => {
@@ -524,7 +752,6 @@ function updateStats() {
     document.getElementById('cellCount').textContent = cellCount;
 }
 
-
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
     const columnNameInput = document.getElementById('columnName');
@@ -540,124 +767,6 @@ window.onclick = function (event) {
     });
 }
 
-function saveTable() {
-    const table = document.getElementById('dynamicTable');
-    const data = {
-        headers: [],
-        rows: [],
-    };
-
-    const headers = table.querySelectorAll('thead th');
-    headers.forEach(header => {
-        if (header.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-        data.headers.push({
-            text: header.textContent,
-            style: {
-                backgroundColor: header.style.backgroundColor,
-                color: header.style.color
-            }
-        });
-    });
-
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-        const rowData = [];
-        Array.from(row.cells).forEach(cell => {
-            if (cell.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-            const input = cell.querySelector('.editable');
-            rowData.push({
-                text: input ? input.value : cell.textContent,
-                style: {
-                    backgroundColor: cell.style.backgroundColor,
-                    color: cell.style.color,
-                    isReadonly: input ? input.readOnly : false
-                }
-            });
-        });
-        if (rowData.length > 0) {
-            data.rows.push(rowData);
-        }
-    });
-
-    const jsonData = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonData], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `anadolu_genclik_tablo_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-function loadTable() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = function (event) {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (isMultiDeleteModeActive) {
-                        toggleMultiDeleteMode();
-                    }
-                    loadTableFromData(data);
-                } catch (error) {
-                    alert('Dosya yüklenirken hata oluştu: ' + error.message);
-                }
-            };
-            reader.readAsText(file);
-        }
-    };
-    input.click();
-}
-
-function loadTableFromData(data) {
-    const table = document.getElementById('dynamicTable');
-    const theadTr = table.querySelector('thead tr');
-    const tbody = table.querySelector('tbody');
-
-    theadTr.innerHTML = '';
-    tbody.innerHTML = '';
-    clearSelection();
-
-    data.headers.forEach((headerData, index) => {
-        const th = document.createElement('th');
-        th.textContent = headerData.text;
-        th.style.backgroundColor = headerData.style.backgroundColor || '#2c3e50';
-        th.style.color = headerData.style.color || 'white';
-        theadTr.appendChild(th);
-    });
-
-    data.rows.forEach(rowData => {
-        const tr = tbody.insertRow();
-        tr.onclick = function () { selectRow(this); };
-        tr.style.cursor = 'pointer';
-
-        rowData.forEach(cellData => {
-            const td = tr.insertCell();
-            td.onclick = function (event) { selectCell(this, event); };
-            td.style.cursor = 'pointer';
-            td.innerHTML = `<input type="text" class="editable" value="${cellData.text || ''}" ${cellData.isReadonly ? 'readonly' : ''}>`;
-            td.style.backgroundColor = cellData.style.backgroundColor || '';
-            td.style.color = cellData.style.color || '';
-
-            const input = td.querySelector('.editable');
-            if (input && cellData.style.color) {
-                input.style.color = cellData.style.color;
-            }
-        });
-    });
-
-    updateStats();
-    updateColumnClickEvents();
-    updateRowNumbers();
-}
-
 function clearTable() {
     if (confirm('Tüm tabloyu temizlemek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
         const table = document.getElementById('dynamicTable');
@@ -666,8 +775,8 @@ function clearTable() {
 
         const theadTr = table.querySelector('thead tr');
         theadTr.innerHTML = `
-                <th onclick="selectColumn(0)" style="background: #2c3e50; color: white; cursor: pointer;">ID</th>
-            `;
+            <th onclick="selectColumn(0)" style="background: #2c3e50; color: white; cursor: pointer;">ID</th>
+        `;
 
         if (isMultiDeleteModeActive) {
             toggleMultiDeleteMode();
@@ -789,7 +898,6 @@ async function exportToExcelAdvanced() {
     if (wasMultiDeleteActive) showRowCheckboxes();
 }
 
-
 function colorToARGB(color) {
     if (!color || color === 'transparent') return 'FFFFFFFF';
 
@@ -868,32 +976,16 @@ function exportToCSV() {
 
 function toggleMultiDeleteMode() {
     isMultiDeleteModeActive = !isMultiDeleteModeActive;
-    const toggleBtn = document.getElementById('toggleMultiDeleteBtn');
-    const confirmBtn = document.getElementById('confirmDeleteSelectedBtn');
-    const singleDeleteRowBtn = document.getElementById('singleDeleteRowBtn');
-    const addColumnBtn = document.getElementById('addColumnBtn');
-    const deleteColumnBtn = document.getElementById('deleteColumnBtn');
+    const multiDeleteToolbar = document.getElementById('multiDeleteToolbar');
 
     if (isMultiDeleteModeActive) {
         showRowCheckboxes();
-        toggleBtn.textContent = '✖️ İptal';
-        toggleBtn.classList.remove('btn-info');
-        toggleBtn.classList.add('btn-danger');
-        confirmBtn.style.display = 'inline-block';
-        if (singleDeleteRowBtn) singleDeleteRowBtn.style.display = 'none';
-        if (addColumnBtn) addColumnBtn.disabled = true;
-        if (deleteColumnBtn) deleteColumnBtn.disabled = true;
+        multiDeleteToolbar.style.display = 'flex';
         clearSelection(false);
         updateSelectionInfo('Çoklu satır silme modu aktif. Satırları seçip onaylayın.');
     } else {
         hideRowCheckboxes();
-        toggleBtn.textContent = '🔪 Çoklu Silme';
-        toggleBtn.classList.remove('btn-danger');
-        toggleBtn.classList.add('btn-info');
-        confirmBtn.style.display = 'none';
-        if (singleDeleteRowBtn) singleDeleteRowBtn.style.display = 'inline-block';
-        if (addColumnBtn) addColumnBtn.disabled = false;
-        if (deleteColumnBtn) deleteColumnBtn.disabled = false;
+        multiDeleteToolbar.style.display = 'none';
         updateSelectionInfo(null);
     }
     updateColumnClickEvents();
@@ -907,7 +999,6 @@ function showRowCheckboxes() {
     if (theadTr && !theadTr.querySelector(`th.${CHECKBOX_COLUMN_CLASS}`)) {
         const th = document.createElement('th');
         th.classList.add(CHECKBOX_COLUMN_CLASS);
-        // th.innerHTML = '<input type="checkbox" onclick="toggleSelectAllRows(this)" title="Tümünü Seç/Kaldır">';
         th.style.width = '40px';
         th.style.background = '#34495e';
         th.style.textAlign = 'center';
@@ -957,42 +1048,40 @@ function confirmDeleteSelectedRows() {
 
     if (confirm(`${rowsToDelete.length} satır silinecek. Emin misiniz?`)) {
         rowsToDelete.forEach(row => row.remove());
-
-        isMultiDeleteModeActive = false;
-        hideRowCheckboxes();
-
-        const toggleBtn = document.getElementById('toggleMultiDeleteBtn');
-        const confirmBtn = document.getElementById('confirmDeleteSelectedBtn');
-        const singleDeleteRowBtn = document.getElementById('singleDeleteRowBtn');
-        const addColumnBtn = document.getElementById('addColumnBtn');
-        const deleteColumnBtn = document.getElementById('deleteColumnBtn');
-
-        toggleBtn.textContent = '🔪 Çoklu Silme';
-        toggleBtn.classList.remove('btn-danger');
-        toggleBtn.classList.add('btn-info');
-        confirmBtn.style.display = 'none';
-        if (singleDeleteRowBtn) singleDeleteRowBtn.style.display = 'inline-block';
-        if (addColumnBtn) addColumnBtn.disabled = false;
-        if (deleteColumnBtn) deleteColumnBtn.disabled = false;
-
+        toggleMultiDeleteMode();
         updateStats();
         updateRowNumbers();
-        updateSelectionInfo(null);
-        updateColumnClickEvents();
     }
 }
+
+document.addEventListener('keydown', function(event) {
+    if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+            case 's':
+            case 'S':
+                event.preventDefault();
+                saveTableAsExcel();
+                break;
+            case 'o':
+            case 'O':
+                event.preventDefault();
+                loadTableFromExcel();
+                break;
+            case 'p':
+            case 'P':
+                event.preventDefault();
+                printTableOnly();
+                break;
+        }
+    }
+});
+
 const originalOnload = window.onload;
 window.onload = function () {
     if (originalOnload) {
         originalOnload();
     }
-    updateFixedElementLayout();
     updateStats();
     updateColumnClickEvents();
     updateRowNumbers();
-    const addColumnBtn = document.getElementById('addColumnBtn');
-    const deleteColumnBtn = document.getElementById('deleteColumnBtn');
-    if (addColumnBtn) addColumnBtn.disabled = false;
-    if (deleteColumnBtn) deleteColumnBtn.disabled = false;
 }
-window.addEventListener('resize', updateFixedElementLayout);
