@@ -379,28 +379,33 @@ function selectRow(row) {
     updateSelectionInfo(`Satır ${rowIndex} seçildi.`);
 }
 
-function selectColumn(index) {
-    const headerCell = document.getElementById('dynamicTable').querySelector('thead tr').cells[index];
+function selectColumn(headerCell, event, visualIndex) {
     if (isMultiDeleteModeActive || (headerCell && headerCell.classList.contains(CHECKBOX_COLUMN_CLASS))) {
         return;
     }
     clearSelection(false);
 
-    selectedColumn = index;
-    const table = document.getElementById('dynamicTable');
-    const rows = table.querySelectorAll('tr');
-    let headerText = "";
+    if (event && event.shiftKey) {
+        selectedColumn = visualIndex;
+        const table = document.getElementById('dynamicTable');
+        const rows = table.querySelectorAll('tr');
+        let headerText = "";
 
-    rows.forEach(rowNode => {
-        const cell = rowNode.cells[index];
-        if (cell) {
-            cell.classList.add('selected-column');
-            if (rowNode.parentNode.tagName === 'THEAD') {
-                headerText = cell.textContent;
+        rows.forEach(rowNode => {
+            const cell = rowNode.cells[visualIndex];
+            if (cell) {
+                cell.classList.add('selected-column');
+                if (rowNode.parentNode.tagName === 'THEAD') {
+                    headerText = cell.textContent;
+                }
             }
-        }
-    });
-    updateSelectionInfo(`Sütun "${headerText || index + 1}" seçildi.`);
+        });
+        updateSelectionInfo(`Sütun "${headerText || visualIndex + 1}" seçildi.`);
+    } else {
+        selectedCell = headerCell;
+        headerCell.classList.add('selected-cell');
+        updateSelectionInfo(`Başlık hücresi seçildi: Sütun "${headerCell.textContent}"`);
+    }
 }
 
 function showColorPalette(target) {
@@ -531,15 +536,27 @@ function addRow() {
     const newRow = tbody.insertRow();
     const headerRow = table.querySelector('thead tr');
 
-    let dataColumnCount = 0;
-    if (headerRow) {
-        Array.from(headerRow.cells).forEach(th => {
-            if (!th.classList.contains(CHECKBOX_COLUMN_CLASS)) {
-                dataColumnCount++;
-            }
-        });
-    } else {
-        dataColumnCount = 5;
+    if (!headerRow) {
+        console.error("Başlık satırı bulunamadı, satır eklenemiyor.");
+        const tempTh = document.createElement('th');
+        tempTh.textContent = "Sütun 1";
+        const tempHeaderRow = table.querySelector('thead').insertRow();
+        tempHeaderRow.appendChild(tempTh);
+        updateColumnClickEvents();
+        addRow();
+        return;
+    }
+    
+    const headerCells = Array.from(headerRow.cells);
+    let dataColumnCount = headerCells.filter(th => !th.classList.contains(CHECKBOX_COLUMN_CLASS)).length;
+
+    if (dataColumnCount === 0 && headerCells.length > 0) dataColumnCount = 1;
+    else if (dataColumnCount === 0 && headerCells.length === 0) {
+        const idTh = document.createElement('th');
+        idTh.textContent = 'Sütun 1';
+        headerRow.appendChild(idTh);
+        updateColumnClickEvents();
+        dataColumnCount = 1;
     }
 
     if (isMultiDeleteModeActive) {
@@ -559,32 +576,12 @@ function addRow() {
         const cell = newRow.insertCell();
         cell.onclick = function (event) { selectCell(this, event); };
         cell.style.cursor = 'pointer';
-
-        let cellValue = "";
-        let actualDataHeaderCell = null;
-        let currentDataColIdx = 0;
-        if (headerRow) {
-            Array.from(headerRow.cells).forEach(th => {
-                if (!th.classList.contains(CHECKBOX_COLUMN_CLASS)) {
-                    if (currentDataColIdx === i) {
-                        actualDataHeaderCell = th;
-                    }
-                    currentDataColIdx++;
-                }
-            });
-        }
-
-        if (i === 0 && actualDataHeaderCell && (actualDataHeaderCell.textContent.toLowerCase().includes('id') || actualDataHeaderCell.textContent.toLowerCase().includes('sıra no'))) {
-            cellValue = (tbody.rows.length).toString().padStart(1, '0');
-            cell.innerHTML = `<input type="text" class="editable" value="${cellValue}" readonly>`;
-        } else {
-            cell.innerHTML = `<input type="text" class="editable" value="">`;
-        }
+        cell.innerHTML = `<input type="text" class="editable" value="">`;
     }
 
     newRow.onclick = function () { selectRow(this); };
     updateStats();
-    updateRowNumbers();
+    updateRowNumbers(); 
 }
 
 function addColumn() {
@@ -597,27 +594,45 @@ function confirmAddColumn() {
     const table = document.getElementById('dynamicTable');
 
     const headerRow = table.querySelector('thead tr');
-    const newHeader = document.createElement('th');
-    newHeader.textContent = columnName;
-    newHeader.style.background = '#2c3e50';
-    newHeader.style.color = 'white';
+    if (!headerRow) { 
+      const newHeaderRow = table.querySelector('thead').insertRow();
+      const newHeader = document.createElement('th');
+      newHeader.textContent = columnName;
+      newHeader.style.background = '#2c3e50';
+      newHeader.style.color = 'white';
+      newHeaderRow.appendChild(newHeader);
 
-    const bodyRows = table.querySelectorAll('tbody tr');
-
-    let insertAtIndex;
-    if (position === 'start') {
-        insertAtIndex = headerRow.cells[0]?.classList.contains(CHECKBOX_COLUMN_CLASS) ? 1 : 0;
-    } else {
-        insertAtIndex = headerRow.cells.length;
-    }
-
-    headerRow.insertBefore(newHeader, headerRow.cells[insertAtIndex] || null);
-    bodyRows.forEach(row => {
-        const newCell = row.insertCell(insertAtIndex);
+      const bodyRows = table.querySelectorAll('tbody tr');
+       bodyRows.forEach(row => {
+        const newCell = row.insertCell(0);
         newCell.onclick = function (event) { selectCell(this, event); };
         newCell.style.cursor = 'pointer';
         newCell.innerHTML = `<input type="text" class="editable" value="">`;
-    });
+      });
+
+    } else {
+        const newHeader = document.createElement('th');
+        newHeader.textContent = columnName;
+        newHeader.style.background = '#2c3e50';
+        newHeader.style.color = 'white';
+
+        const bodyRows = table.querySelectorAll('tbody tr');
+        let insertAtIndex;
+        if (position === 'start') {
+            insertAtIndex = headerRow.cells[0]?.classList.contains(CHECKBOX_COLUMN_CLASS) ? 1 : 0;
+        } else {
+            insertAtIndex = headerRow.cells.length;
+        }
+
+        headerRow.insertBefore(newHeader, headerRow.cells[insertAtIndex] || null);
+        bodyRows.forEach(row => {
+            const newCell = row.insertCell(insertAtIndex);
+            newCell.onclick = function (event) { selectCell(this, event); };
+            newCell.style.cursor = 'pointer';
+            newCell.innerHTML = `<input type="text" class="editable" value="">`;
+        });
+    }
+
 
     closeModal('columnModal');
     updateStats();
@@ -648,27 +663,7 @@ function deleteSelectedColumn() {
         alert('Kontrol kutusu sütunu bu şekilde silinemez.');
         return;
     }
-    let isFirstDataColumnId = false;
-    if (headerCellToDelete) {
-        let dataColIndex = 0;
-        let visualIndexCounter = 0;
-        Array.from(table.querySelector('thead tr').cells).forEach((th, vIdx) => {
-            if (!th.classList.contains(CHECKBOX_COLUMN_CLASS)) {
-                if (vIdx === selectedColumn) {
-                    if (dataColIndex === 0 && (th.textContent.toLowerCase().includes('id') || th.textContent.toLowerCase().includes('sıra no'))) {
-                        isFirstDataColumnId = true;
-                    }
-                }
-                dataColIndex++;
-            }
-        });
-    }
-    if (isFirstDataColumnId) {
-        if (!confirm('"ID/Sıra No" sütununu silmek üzeresiniz. Bu işlem verilerinizin sıralamasını etkileyebilir ve önerilmez. Devam etmek istiyor musunuz?')) {
-            return;
-        }
-    }
-
+    
     const rows = table.querySelectorAll('tr');
     rows.forEach(row => {
         if (row.cells[selectedColumn]) {
@@ -683,54 +678,90 @@ function deleteSelectedColumn() {
     updateRowNumbers();
 }
 
+function makeHeaderEditable(thElement) {
+    const originalText = thElement.textContent;
+    const visualIndexOfTh = Array.from(thElement.parentNode.children).indexOf(thElement);
+
+    const originalOnClick = thElement.onclick;
+    const originalOnDblClick = thElement.ondblclick;
+    thElement.onclick = null;
+    thElement.ondblclick = null; 
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = originalText;
+    input.classList.add('editable-header'); 
+    input.style.width = '90%';
+    input.style.border = '1px solid #3498db';
+    input.style.padding = '5px';
+    input.style.fontFamily = 'inherit'; 
+    input.style.fontSize = 'inherit';   
+    input.style.fontWeight = 'normal'; 
+
+    thElement.innerHTML = ''; 
+    thElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveHeader = () => {
+        let newText = input.value.trim();
+        if (newText === '') {
+            newText = originalText; 
+        }
+
+        thElement.innerHTML = ''; 
+        thElement.textContent = newText; 
+        
+        thElement.onclick = (event) => selectColumn(thElement, event, visualIndexOfTh);
+        thElement.ondblclick = () => makeHeaderEditable(thElement);
+    };
+
+    const cancelEdit = () => {
+        thElement.innerHTML = '';
+        thElement.textContent = originalText;
+        thElement.onclick = originalOnClick;
+        thElement.ondblclick = originalOnDblClick;
+    };
+    
+    function handleBlur() {
+        saveHeader();
+        input.removeEventListener('blur', handleBlur);
+    }
+
+    input.addEventListener('blur', handleBlur);
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); 
+            saveHeader();
+        } else if (e.key === 'Escape') {
+            cancelEdit();
+        }
+    });
+}
+
+
 function updateColumnClickEvents() {
     const headers = document.querySelectorAll('#dynamicTable thead th');
-    headers.forEach((header, index) => {
+    headers.forEach((header, visualIndex) => {
         const newHeader = header.cloneNode(true);
-        header.parentNode.replaceChild(newHeader, header);
+        if (header.parentNode) {
+            header.parentNode.replaceChild(newHeader, header);
+        }
+
         if (!newHeader.classList.contains(CHECKBOX_COLUMN_CLASS)) {
-            newHeader.onclick = function () { selectColumn(index); };
+            newHeader.onclick = function (event) { selectColumn(this, event, visualIndex); };
+            newHeader.ondblclick = function () { makeHeaderEditable(this); }; 
             newHeader.style.cursor = 'pointer';
         } else {
             newHeader.style.cursor = 'default';
+            newHeader.ondblclick = null; 
         }
     });
 }
 
 function updateRowNumbers() {
-    const table = document.getElementById('dynamicTable');
-    const headerRow = table.querySelector('thead tr');
-    const tbody = table.querySelector('tbody');
-
-    if (!headerRow || !tbody || headerRow.cells.length === 0) return;
-
-    let idColumnVisualIndex = -1;
-    let dataColumnCounter = 0;
-
-    Array.from(headerRow.cells).forEach((th, visualIndex) => {
-        if (!th.classList.contains(CHECKBOX_COLUMN_CLASS)) {
-            if (dataColumnCounter === 0) {
-                if (th.textContent.toLowerCase().includes('id') || th.textContent.toLowerCase().includes('sıra no')) {
-                    idColumnVisualIndex = visualIndex;
-                }
-            }
-            dataColumnCounter++;
-        }
-    });
-
-    if (idColumnVisualIndex !== -1) {
-        const bodyRows = tbody.querySelectorAll('tr');
-        bodyRows.forEach((row, rowIndex) => {
-            const idCell = row.cells[idColumnVisualIndex];
-            if (idCell) {
-                const input = idCell.querySelector('.editable');
-                if (input && input.hasAttribute('readonly')) {
-                    const newRowNumber = (rowIndex + 1).toString().padStart(1, '0');
-                    input.value = newRowNumber;
-                }
-            }
-        });
-    }
+   
 }
 
 function updateStats()
@@ -775,9 +806,16 @@ function clearTable() {
         tbody.innerHTML = '';
 
         const theadTr = table.querySelector('thead tr');
-        theadTr.innerHTML = `
-            <th onclick="selectColumn(0)" style="background: #2c3e50; color: white; cursor: pointer;">ID</th>
-        `;
+        if (theadTr) {
+            theadTr.innerHTML = '';
+            const initialTh = document.createElement('th');
+            initialTh.textContent = 'Sütun 1';
+            initialTh.style.background = '#2c3e50';
+            initialTh.style.color = 'white';
+            initialTh.style.cursor = 'pointer';
+            theadTr.appendChild(initialTh);
+        }
+
 
         if (isMultiDeleteModeActive) {
             toggleMultiDeleteMode();
