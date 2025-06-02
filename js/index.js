@@ -733,7 +733,8 @@ function updateRowNumbers() {
     }
 }
 
-function updateStats() {
+function updateStats()
+{
     const table = document.getElementById('dynamicTable');
     const rowCount = table.querySelectorAll('tbody tr').length;
     const headerRow = table.querySelector('thead tr');
