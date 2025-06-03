@@ -198,7 +198,14 @@ function loadExcelData(worksheet) {
     const headerRow = worksheet.getRow(1);
     headerRow.eachCell((cell, colNumber) => {
         const th = document.createElement('th');
-        th.textContent = cell.value || `Sütun ${colNumber}`;
+        let headerText = cell.value || `Sütun ${colNumber}`;
+        
+        // İlk sütunu her zaman ID olarak ayarla
+        if (colNumber === 1) {
+            headerText = 'ID';
+        }
+        
+        th.textContent = headerText;
         
         if (cell.fill && cell.fill.fgColor) {
             th.style.backgroundColor = argbToHex(cell.fill.fgColor.argb);
@@ -229,7 +236,13 @@ function loadExcelData(worksheet) {
                 
                 const value = cell.value || '';
                 
-                const isReadonly = cell.note && cell.note.includes('readonly:true');
+                // İlk sütun (ID) için özel işlem
+                let isReadonly = false;
+                if (colNumber === 1) {
+                    isReadonly = true; // ID sütunu her zaman readonly
+                } else {
+                    isReadonly = cell.note && cell.note.includes('readonly:true');
+                }
                 
                 td.innerHTML = `<input type="text" class="editable" value="${value}" ${isReadonly ? 'readonly' : ''}>`;
                 
@@ -250,7 +263,7 @@ function loadExcelData(worksheet) {
     
     updateStats();
     updateColumnClickEvents();
-    updateRowNumbers();
+    updateRowNumbers(); // ID'leri yeniden düzenle
 }
 
 function argbToHex(argb) {
@@ -539,7 +552,9 @@ function addRow() {
     if (!headerRow) {
         console.error("Başlık satırı bulunamadı, satır eklenemiyor.");
         const tempTh = document.createElement('th');
-        tempTh.textContent = "Sütun 1";
+        tempTh.textContent = "ID";
+        tempTh.style.background = '#2c3e50';
+        tempTh.style.color = 'white';
         const tempHeaderRow = table.querySelector('thead').insertRow();
         tempHeaderRow.appendChild(tempTh);
         updateColumnClickEvents();
@@ -553,7 +568,9 @@ function addRow() {
     if (dataColumnCount === 0 && headerCells.length > 0) dataColumnCount = 1;
     else if (dataColumnCount === 0 && headerCells.length === 0) {
         const idTh = document.createElement('th');
-        idTh.textContent = 'Sütun 1';
+        idTh.textContent = 'ID';
+        idTh.style.background = '#2c3e50';
+        idTh.style.color = 'white';
         headerRow.appendChild(idTh);
         updateColumnClickEvents();
         dataColumnCount = 1;
@@ -572,16 +589,26 @@ function addRow() {
         cbCell.onclick = function (event) { event.stopPropagation(); checkbox.click(); };
     }
 
+    // Yeni ID hesapla - mevcut satır sayısına göre
+    const currentRowCount = tbody.rows.length;
+    const newId = currentRowCount;
+
     for (let i = 0; i < dataColumnCount; i++) {
         const cell = newRow.insertCell();
         cell.onclick = function (event) { selectCell(this, event); };
         cell.style.cursor = 'pointer';
-        cell.innerHTML = `<input type="text" class="editable" value="">`;
+        
+        // İlk sütun ID ise otomatik değer ata ve readonly yap
+        if (i === 0) {
+            cell.innerHTML = `<input type="text" class="editable" value="${newId}" readonly>`;
+        } else {
+            cell.innerHTML = `<input type="text" class="editable" value="">`;
+        }
     }
 
     newRow.onclick = function () { selectRow(this); };
     updateStats();
-    updateRowNumbers(); 
+    updateRowNumbers(); // ID'leri yeniden düzenle
 }
 
 function addColumn() {
@@ -761,7 +788,31 @@ function updateColumnClickEvents() {
 }
 
 function updateRowNumbers() {
-   
+    const table = document.getElementById('dynamicTable');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    if (rows.length === 0) return;
+    
+    // Her satırın ID'sini sırasıyla güncelle (1'den başlayarak)
+    rows.forEach((row, index) => {
+        const cells = Array.from(row.cells);
+        
+        // Checkbox sütunu varsa onu atla
+        let firstDataCellIndex = 0;
+        if (cells[0] && cells[0].classList.contains(CHECKBOX_COLUMN_CLASS)) {
+            firstDataCellIndex = 1;
+        }
+        
+        // İlk veri hücresi (ID sütunu) varsa güncelle
+        if (cells[firstDataCellIndex]) {
+            const input = cells[firstDataCellIndex].querySelector('.editable');
+            if (input) {
+                input.value = index + 1; // 1'den başlayarak numaralandır
+                input.readOnly = true; // ID sütununu her zaman readonly yap
+            }
+        }
+    });
 }
 
 function updateStats()
@@ -809,13 +860,12 @@ function clearTable() {
         if (theadTr) {
             theadTr.innerHTML = '';
             const initialTh = document.createElement('th');
-            initialTh.textContent = 'Sütun 1';
+            initialTh.textContent = 'ID'; // İlk sütunu ID olarak ayarla
             initialTh.style.background = '#2c3e50';
             initialTh.style.color = 'white';
             initialTh.style.cursor = 'pointer';
             theadTr.appendChild(initialTh);
         }
-
 
         if (isMultiDeleteModeActive) {
             toggleMultiDeleteMode();
