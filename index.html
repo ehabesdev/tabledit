@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anadolu Gençlik Derneği - Tablo Editörü</title>
+    <title>Tabledit</title>
     <link rel="stylesheet" type="text/css" href="css/index.css">
+    <link rel="stylesheet" type="text/css" href="css/auth.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="js/index.js"></script>
     <link rel="icon" type="image/png" href="img/favicon.png">
 </head>
 
@@ -118,6 +118,41 @@
                         </button>
                     </div>
                 </div>
+
+                <div class="navbar-right">
+                    <div class="auth-buttons">
+                        <button class="auth-btn login" onclick="openAuthModal('login')">Giriş Yap</button>
+                        <button class="auth-btn register" onclick="openAuthModal('register')">Kayıt Ol</button>
+                    </div>
+
+                    <div class="user-profile">
+                        <div class="user-avatar" onclick="toggleUserDropdown()">??</div>
+                        <div class="user-name" onclick="toggleUserDropdown()">Yükleniyor...</div>
+
+                        <div class="user-dropdown">
+                            <div class="dropdown-header">
+                                <div class="user-name">Yükleniyor...</div>
+                                <div class="user-email">email@example.com</div>
+                            </div>
+                            <button class="menu-item" onclick="openProfile()">
+                                <span class="icon">👤</span>
+                                <span class="text">Profil</span>
+                            </button>
+                            <button class="menu-item" onclick="openMyFiles()">
+                                <span class="icon">📁</span>
+                                <span class="text">Dosyalarım</span>
+                            </button>
+                            <button class="menu-item" onclick="createNewFile()">
+                                <span class="icon">📄</span>
+                                <span class="text">Yeni Dosya</span>
+                            </button>
+                            <button class="menu-item logout" onclick="logoutUser()">
+                                <span class="icon">🚪</span>
+                                <span class="text">Çıkış Yap</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="quick-toolbar">
@@ -174,7 +209,7 @@
                         <td onclick="selectCell(this, event)" style="cursor: pointer;"><input type="text"
                                 class="editable" value="2" readonly></td>
                         <td onclick="selectCell(this, event)" style="cursor: pointer;"><input type="text"
-                                class="editable" value="Elif KAYA"></td>
+                                class="editable" value="Turan KAYA"></td>
                         <td onclick="selectCell(this, event)" style="cursor: pointer;"><input type="text"
                                 class="editable" value="Sekreter"></td>
                         <td onclick="selectCell(this, event)" style="cursor: pointer;"><input type="text"
@@ -275,6 +310,117 @@
             <button class="btn btn-success" onclick="confirmAddColumn()">Ekle</button>
         </div>
     </div>
+
+    <div id="registerModal" class="auth-modal">
+        <div class="auth-modal-content">
+            <div class="auth-modal-header">
+                <h3>Hesap Oluştur</h3>
+                <div class="subtitle">Ücretsiz hesabınızı oluşturun</div>
+                <span class="auth-modal-close" onclick="closeAuthModal('register')">&times;</span>
+            </div>
+            <div class="auth-modal-body">
+                <div id="registerError" class="auth-error"></div>
+                <div id="registerSuccess" class="auth-success"></div>
+
+                <form id="registerForm">
+                    <div class="auth-form-group">
+                        <label for="registerName">Ad Soyad *</label>
+                        <input type="text" id="registerName" placeholder="Adınız ve soyadınız" required>
+                    </div>
+
+                    <div class="auth-form-row">
+                        <div class="auth-form-group">
+                            <label for="registerCity">İl *</label>
+                            <select id="registerCity" required>
+                                <option value="">İl Seçin</option>
+                                <option value="İstanbul">İstanbul</option>
+                                <option value="Ankara">Ankara</option>
+                                <option value="İzmir">İzmir</option>
+                                <option value="Kocaeli">Kocaeli</option>
+                                <option value="Antalya">Antalya</option>
+                                <option value="Bursa">Bursa</option>
+                            </select>
+                        </div>
+                        <div class="auth-form-group">
+                            <label for="registerDistrict">İlçe *</label>
+                            <select id="registerDistrict" required>
+                                <option value="">İlçe Seçin</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="auth-form-group">
+                        <label for="registerEmail">E-posta *</label>
+                        <input type="email" id="registerEmail" placeholder="ornek@email.com" required>
+                    </div>
+
+                    <div class="auth-form-group">
+                        <label for="registerPassword">Şifre *</label>
+                        <input type="password" id="registerPassword" placeholder="En az 6 karakter" required>
+                    </div>
+
+                    <button type="submit" id="registerSubmit" class="auth-submit-btn">Hesap Oluştur</button>
+
+                    <div id="registerLoading" class="auth-loading">
+                        <div class="auth-spinner"></div>
+                        <span>Hesap oluşturuluyor...</span>
+                    </div>
+                </form>
+
+                <div class="auth-switch">
+                    Zaten hesabınız var mı?
+                    <span class="auth-switch-link" onclick="closeAuthModal('register'); openAuthModal('login');">
+                        Giriş yapın
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loginModal" class="auth-modal">
+        <div class="auth-modal-content">
+            <div class="auth-modal-header">
+                <h3>Giriş Yap</h3>
+                <div class="subtitle">Hesabınıza giriş yapın</div>
+                <span class="auth-modal-close" onclick="closeAuthModal('login')">&times;</span>
+            </div>
+            <div class="auth-modal-body">
+                <div id="loginError" class="auth-error"></div>
+                <div id="loginSuccess" class="auth-success"></div>
+
+                <form id="loginForm">
+                    <div class="auth-form-group">
+                        <label for="loginEmail">E-posta</label>
+                        <input type="email" id="loginEmail" placeholder="ornek@email.com" required>
+                    </div>
+
+                    <div class="auth-form-group">
+                        <label for="loginPassword">Şifre</label>
+                        <input type="password" id="loginPassword" placeholder="Şifrenizi girin" required>
+                    </div>
+
+                    <button type="submit" id="loginSubmit" class="auth-submit-btn">Giriş Yap</button>
+
+                    <div id="loginLoading" class="auth-loading">
+                        <div class="auth-spinner"></div>
+                        <span>Giriş yapılıyor...</span>
+                    </div>
+                </form>
+
+                <div class="auth-switch">
+                    Hesabınız yok mu?
+                    <span class="auth-switch-link" onclick="closeAuthModal('login'); openAuthModal('register');">
+                        Kayıt olun
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/user-manager.js"></script>
+    <script src="js/index.js"></script>
 
 </body>
 

@@ -9,15 +9,15 @@ function toggleMenu(menuId) {
     const menu = document.getElementById(menuId);
     const allMenus = document.querySelectorAll('.dropdown-menu');
     const allButtons = document.querySelectorAll('.nav-button');
-    
+
     allMenus.forEach(m => {
         if (m.id !== menuId) {
             m.classList.remove('show');
         }
     });
-    
+
     menu.classList.toggle('show');
-    
+
     const button = document.querySelector(`[onclick="toggleMenu('${menuId}')"]`);
     allButtons.forEach(b => b.classList.remove('active'));
     if (menu.classList.contains('show')) {
@@ -25,7 +25,7 @@ function toggleMenu(menuId) {
     }
 }
 
-document.addEventListener('click', function(event) {
+document.addEventListener('click', function (event) {
     if (!event.target.closest('.nav-menu')) {
         document.querySelectorAll('.dropdown-menu').forEach(menu => {
             menu.classList.remove('show');
@@ -51,9 +51,9 @@ async function saveTableAsExcel() {
     table.querySelectorAll('thead th').forEach(th => {
         if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
         headers.push(th.textContent.trim());
-        headerStyles.push({ 
-            bg: th.style.backgroundColor || '#2c3e50', 
-            text: th.style.color || '#ffffff' 
+        headerStyles.push({
+            bg: th.style.backgroundColor || '#2c3e50',
+            text: th.style.color || '#ffffff'
         });
     });
 
@@ -65,16 +65,16 @@ async function saveTableAsExcel() {
     const headerRow = worksheet.addRow(headers);
     headerRow.eachCell((cell, colNumber) => {
         const style = headerStyles[colNumber - 1];
-        cell.fill = { 
-            type: 'pattern', 
-            pattern: 'solid', 
-            fgColor: { argb: colorToARGB(style.bg) } 
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: colorToARGB(style.bg) }
         };
-        cell.font = { 
-            name: 'Calibri', 
-            size: 12, 
-            bold: true, 
-            color: { argb: colorToARGB(style.text) } 
+        cell.font = {
+            name: 'Calibri',
+            size: 12,
+            bold: true,
+            color: { argb: colorToARGB(style.text) }
         };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = {
@@ -91,15 +91,15 @@ async function saveTableAsExcel() {
         const rowData = [];
         const cellStyles = [];
         const cellMeta = [];
-        
+
         Array.from(trNode.cells).forEach((td, idx) => {
             if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-            
+
             const input = td.querySelector('.editable');
             rowData.push(input ? input.value.trim() : td.textContent.trim());
-            cellStyles.push({ 
-                bg: td.style.backgroundColor || '#ffffff', 
-                text: td.style.color || '#000000' 
+            cellStyles.push({
+                bg: td.style.backgroundColor || '#ffffff',
+                text: td.style.color || '#000000'
             });
             cellMeta.push({
                 readonly: input ? input.readOnly : false
@@ -111,21 +111,21 @@ async function saveTableAsExcel() {
             dataRow.eachCell((cell, colNumber) => {
                 const style = cellStyles[colNumber - 1];
                 const meta = cellMeta[colNumber - 1];
-                
-                cell.font = { 
-                    name: 'Calibri', 
-                    size: 11, 
-                    color: { argb: colorToARGB(style.text) } 
+
+                cell.font = {
+                    name: 'Calibri',
+                    size: 11,
+                    color: { argb: colorToARGB(style.text) }
                 };
-                
+
                 if (style.bg && style.bg !== 'rgb(255, 255, 255)' && style.bg !== '#ffffff' && style.bg !== 'transparent' && style.bg !== '') {
-                    cell.fill = { 
-                        type: 'pattern', 
-                        pattern: 'solid', 
-                        fgColor: { argb: colorToARGB(style.bg) } 
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: colorToARGB(style.bg) }
                     };
                 }
-                
+
                 cell.alignment = { vertical: 'middle', wrapText: true };
                 cell.border = {
                     top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
@@ -133,7 +133,7 @@ async function saveTableAsExcel() {
                     bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
                     right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
                 };
-                
+
                 if (meta.readonly) {
                     cell.note = "readonly:true";
                 }
@@ -155,26 +155,26 @@ function loadTableFromExcel() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.xlsx,.xls';
-    input.onchange = async function(event) {
+    input.onchange = async function (event) {
         const file = event.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = async function(e) {
+            reader.onload = async function (e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = new ExcelJS.Workbook();
                     await workbook.xlsx.load(data);
-                    
+
                     const worksheet = workbook.worksheets[0];
                     if (!worksheet) {
                         alert('Excel dosyasında sayfa bulunamadı.');
                         return;
                     }
-                    
+
                     if (isMultiDeleteModeActive) {
                         toggleMultiDeleteMode();
                     }
-                    
+
                     loadExcelData(worksheet);
                 } catch (error) {
                     alert('Dosya yüklenirken hata oluştu: ' + error.message);
@@ -190,66 +190,64 @@ function loadExcelData(worksheet) {
     const table = document.getElementById('dynamicTable');
     const theadTr = table.querySelector('thead tr');
     const tbody = table.querySelector('tbody');
-    
+
     theadTr.innerHTML = '';
     tbody.innerHTML = '';
     clearSelection();
-    
+
     const headerRow = worksheet.getRow(1);
     headerRow.eachCell((cell, colNumber) => {
         const th = document.createElement('th');
         let headerText = cell.value || `Sütun ${colNumber}`;
-        
-        // İlk sütunu her zaman ID olarak ayarla
+
         if (colNumber === 1) {
             headerText = 'ID';
         }
-        
+
         th.textContent = headerText;
-        
+
         if (cell.fill && cell.fill.fgColor) {
             th.style.backgroundColor = argbToHex(cell.fill.fgColor.argb);
         } else {
             th.style.backgroundColor = '#2c3e50';
         }
-        
+
         if (cell.font && cell.font.color) {
             th.style.color = argbToHex(cell.font.color.argb);
         } else {
             th.style.color = 'white';
         }
-        
+
         theadTr.appendChild(th);
     });
-    
+
     for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
         const row = worksheet.getRow(rowNumber);
         if (row.hasValues) {
             const tr = tbody.insertRow();
-            tr.onclick = function() { selectRow(this); };
+            tr.onclick = function () { selectRow(this); };
             tr.style.cursor = 'pointer';
-            
+
             row.eachCell((cell, colNumber) => {
                 const td = tr.insertCell();
-                td.onclick = function(event) { selectCell(this, event); };
+                td.onclick = function (event) { selectCell(this, event); };
                 td.style.cursor = 'pointer';
-                
+
                 const value = cell.value || '';
-                
-                // İlk sütun (ID) için özel işlem
+
                 let isReadonly = false;
                 if (colNumber === 1) {
-                    isReadonly = true; // ID sütunu her zaman readonly
+                    isReadonly = true;
                 } else {
                     isReadonly = cell.note && cell.note.includes('readonly:true');
                 }
-                
+
                 td.innerHTML = `<input type="text" class="editable" value="${value}" ${isReadonly ? 'readonly' : ''}>`;
-                
+
                 if (cell.fill && cell.fill.fgColor) {
                     td.style.backgroundColor = argbToHex(cell.fill.fgColor.argb);
                 }
-                
+
                 if (cell.font && cell.font.color) {
                     td.style.color = argbToHex(cell.font.color.argb);
                     const input = td.querySelector('.editable');
@@ -260,10 +258,10 @@ function loadExcelData(worksheet) {
             });
         }
     }
-    
+
     updateStats();
     updateColumnClickEvents();
-    updateRowNumbers(); // ID'leri yeniden düzenle
+    updateRowNumbers();
 }
 
 function argbToHex(argb) {
@@ -289,7 +287,7 @@ function printTableOnly() {
     if (wasMultiDeleteActive) hideRowCheckboxes();
     const printWindow = window.open('', '_blank');
     const tableHtml = document.querySelector('.table-container').innerHTML;
-    
+
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -329,7 +327,7 @@ function printTableOnly() {
         </body>
         </html>
     `);
-    
+
     printWindow.document.close();
     printWindow.print();
     if (wasMultiDeleteActive) showRowCheckboxes();
@@ -561,7 +559,7 @@ function addRow() {
         addRow();
         return;
     }
-    
+
     const headerCells = Array.from(headerRow.cells);
     let dataColumnCount = headerCells.filter(th => !th.classList.contains(CHECKBOX_COLUMN_CLASS)).length;
 
@@ -589,7 +587,6 @@ function addRow() {
         cbCell.onclick = function (event) { event.stopPropagation(); checkbox.click(); };
     }
 
-    // Yeni ID hesapla - mevcut satır sayısına göre
     const currentRowCount = tbody.rows.length;
     const newId = currentRowCount;
 
@@ -597,8 +594,7 @@ function addRow() {
         const cell = newRow.insertCell();
         cell.onclick = function (event) { selectCell(this, event); };
         cell.style.cursor = 'pointer';
-        
-        // İlk sütun ID ise otomatik değer ata ve readonly yap
+
         if (i === 0) {
             cell.innerHTML = `<input type="text" class="editable" value="${newId}" readonly>`;
         } else {
@@ -608,7 +604,7 @@ function addRow() {
 
     newRow.onclick = function () { selectRow(this); };
     updateStats();
-    updateRowNumbers(); // ID'leri yeniden düzenle
+    updateRowNumbers();
 }
 
 function addColumn() {
@@ -621,21 +617,21 @@ function confirmAddColumn() {
     const table = document.getElementById('dynamicTable');
 
     const headerRow = table.querySelector('thead tr');
-    if (!headerRow) { 
-      const newHeaderRow = table.querySelector('thead').insertRow();
-      const newHeader = document.createElement('th');
-      newHeader.textContent = columnName;
-      newHeader.style.background = '#2c3e50';
-      newHeader.style.color = 'white';
-      newHeaderRow.appendChild(newHeader);
+    if (!headerRow) {
+        const newHeaderRow = table.querySelector('thead').insertRow();
+        const newHeader = document.createElement('th');
+        newHeader.textContent = columnName;
+        newHeader.style.background = '#2c3e50';
+        newHeader.style.color = 'white';
+        newHeaderRow.appendChild(newHeader);
 
-      const bodyRows = table.querySelectorAll('tbody tr');
-       bodyRows.forEach(row => {
-        const newCell = row.insertCell(0);
-        newCell.onclick = function (event) { selectCell(this, event); };
-        newCell.style.cursor = 'pointer';
-        newCell.innerHTML = `<input type="text" class="editable" value="">`;
-      });
+        const bodyRows = table.querySelectorAll('tbody tr');
+        bodyRows.forEach(row => {
+            const newCell = row.insertCell(0);
+            newCell.onclick = function (event) { selectCell(this, event); };
+            newCell.style.cursor = 'pointer';
+            newCell.innerHTML = `<input type="text" class="editable" value="">`;
+        });
 
     } else {
         const newHeader = document.createElement('th');
@@ -659,7 +655,6 @@ function confirmAddColumn() {
             newCell.innerHTML = `<input type="text" class="editable" value="">`;
         });
     }
-
 
     closeModal('columnModal');
     updateStats();
@@ -690,7 +685,7 @@ function deleteSelectedColumn() {
         alert('Kontrol kutusu sütunu bu şekilde silinemez.');
         return;
     }
-    
+
     const rows = table.querySelectorAll('tr');
     rows.forEach(row => {
         if (row.cells[selectedColumn]) {
@@ -712,20 +707,20 @@ function makeHeaderEditable(thElement) {
     const originalOnClick = thElement.onclick;
     const originalOnDblClick = thElement.ondblclick;
     thElement.onclick = null;
-    thElement.ondblclick = null; 
+    thElement.ondblclick = null;
 
     const input = document.createElement('input');
     input.type = 'text';
     input.value = originalText;
-    input.classList.add('editable-header'); 
+    input.classList.add('editable-header');
     input.style.width = '90%';
     input.style.border = '1px solid #3498db';
     input.style.padding = '5px';
-    input.style.fontFamily = 'inherit'; 
-    input.style.fontSize = 'inherit';   
-    input.style.fontWeight = 'normal'; 
+    input.style.fontFamily = 'inherit';
+    input.style.fontSize = 'inherit';
+    input.style.fontWeight = 'normal';
 
-    thElement.innerHTML = ''; 
+    thElement.innerHTML = '';
     thElement.appendChild(input);
     input.focus();
     input.select();
@@ -733,12 +728,12 @@ function makeHeaderEditable(thElement) {
     const saveHeader = () => {
         let newText = input.value.trim();
         if (newText === '') {
-            newText = originalText; 
+            newText = originalText;
         }
 
-        thElement.innerHTML = ''; 
-        thElement.textContent = newText; 
-        
+        thElement.innerHTML = '';
+        thElement.textContent = newText;
+
         thElement.onclick = (event) => selectColumn(thElement, event, visualIndexOfTh);
         thElement.ondblclick = () => makeHeaderEditable(thElement);
     };
@@ -749,7 +744,7 @@ function makeHeaderEditable(thElement) {
         thElement.onclick = originalOnClick;
         thElement.ondblclick = originalOnDblClick;
     };
-    
+
     function handleBlur() {
         saveHeader();
         input.removeEventListener('blur', handleBlur);
@@ -759,14 +754,13 @@ function makeHeaderEditable(thElement) {
 
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            e.preventDefault(); 
+            e.preventDefault();
             saveHeader();
         } else if (e.key === 'Escape') {
             cancelEdit();
         }
     });
 }
-
 
 function updateColumnClickEvents() {
     const headers = document.querySelectorAll('#dynamicTable thead th');
@@ -778,11 +772,11 @@ function updateColumnClickEvents() {
 
         if (!newHeader.classList.contains(CHECKBOX_COLUMN_CLASS)) {
             newHeader.onclick = function (event) { selectColumn(this, event, visualIndex); };
-            newHeader.ondblclick = function () { makeHeaderEditable(this); }; 
+            newHeader.ondblclick = function () { makeHeaderEditable(this); };
             newHeader.style.cursor = 'pointer';
         } else {
             newHeader.style.cursor = 'default';
-            newHeader.ondblclick = null; 
+            newHeader.ondblclick = null;
         }
     });
 }
@@ -791,32 +785,26 @@ function updateRowNumbers() {
     const table = document.getElementById('dynamicTable');
     const tbody = table.querySelector('tbody');
     const rows = Array.from(tbody.querySelectorAll('tr'));
-    
-    if (rows.length === 0) return;
-    
-    // Her satırın ID'sini sırasıyla güncelle (1'den başlayarak)
+
     rows.forEach((row, index) => {
         const cells = Array.from(row.cells);
-        
-        // Checkbox sütunu varsa onu atla
+
         let firstDataCellIndex = 0;
         if (cells[0] && cells[0].classList.contains(CHECKBOX_COLUMN_CLASS)) {
             firstDataCellIndex = 1;
         }
-        
-        // İlk veri hücresi (ID sütunu) varsa güncelle
+
         if (cells[firstDataCellIndex]) {
             const input = cells[firstDataCellIndex].querySelector('.editable');
             if (input) {
-                input.value = index + 1; // 1'den başlayarak numaralandır
-                input.readOnly = true; // ID sütununu her zaman readonly yap
+                input.value = index + 1;
+                input.readOnly = true;
             }
         }
     });
 }
 
-function updateStats()
-{
+function updateStats() {
     const table = document.getElementById('dynamicTable');
     const rowCount = table.querySelectorAll('tbody tr').length;
     const headerRow = table.querySelector('thead tr');
@@ -860,7 +848,7 @@ function clearTable() {
         if (theadTr) {
             theadTr.innerHTML = '';
             const initialTh = document.createElement('th');
-            initialTh.textContent = 'ID'; // İlk sütunu ID olarak ayarla
+            initialTh.textContent = 'ID';
             initialTh.style.background = '#2c3e50';
             initialTh.style.color = 'white';
             initialTh.style.cursor = 'pointer';
@@ -1143,7 +1131,7 @@ function confirmDeleteSelectedRows() {
     }
 }
 
-document.addEventListener('keydown', function(event) {
+document.addEventListener('keydown', function (event) {
     if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
             case 's':
@@ -1165,12 +1153,194 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
+window.openAuthModal = function (type) {
+    import('./auth.js').then(module => {
+        module.openAuthModal(type);
+    }).catch(error => {
+        console.error('Auth modülü yüklenemedi:', error);
+        alert('Giriş sistemi yüklenirken hata oluştu. Sayfayı yenileyin.');
+    });
+}
+
+window.closeAuthModal = function (type) {
+    import('./auth.js').then(module => {
+        module.closeAuthModal(type);
+    }).catch(error => {
+        console.error('Auth modülü yüklenemedi:', error);
+    });
+}
+
+window.toggleUserDropdown = function () {
+    import('./auth.js').then(module => {
+        module.toggleUserDropdown();
+    }).catch(error => {
+        console.error('Auth modülü yüklenemedi:', error);
+    });
+}
+
+window.logoutUser = function () {
+    import('./auth.js').then(module => {
+        module.logoutUser();
+    }).catch(error => {
+        console.error('Auth modülü yüklenemedi:', error);
+        alert('Çıkış sistemi yüklenirken hata oluştu. Sayfayı yenileyin.');
+    });
+}
+
+window.openProfile = function () {
+    alert('Profil sayfası yakında gelecek!');
+}
+
+window.openMyFiles = function () {
+    alert('Dosyalarım sayfası yakında gelecek!');
+}
+
+window.createNewFile = function () {
+    alert('Yeni dosya özelliği yakında gelecek!');
+}
+
+function setupFormEventListeners() {
+    console.log('📋 Form event listener\'ları ekleniyor...');
+    
+    const turkeyData = {
+        'İstanbul': ['Kadıköy', 'Beşiktaş', 'Şişli', 'Bakırköy', 'Üsküdar', 'Fatih', 'Beyoğlu', 'Kartal', 'Maltepe'],
+        'Ankara': ['Çankaya', 'Keçiören', 'Mamak', 'Etimesgut', 'Sincan', 'Altındağ', 'Yenimahalle'],
+        'İzmir': ['Konak', 'Karşıyaka', 'Bornova', 'Buca', 'Gaziemir', 'Balçova', 'Narlıdere'],
+        'Kocaeli': ['İzmit', 'Gebze', 'Darıca', 'Körfez', 'Gölcük', 'Başiskele', 'Çayırova'],
+        'Antalya': ['Muratpaşa', 'Kepez', 'Konyaaltı', 'Aksu', 'Döşemealtı', 'Serik'],
+        'Bursa': ['Osmangazi', 'Nilüfer', 'Yıldırım', 'Gemlik', 'İnegöl', 'Mudanya']
+    };
+    
+    function setupCityDistrictDropdowns() {
+        const citySelect = document.getElementById('registerCity');
+        const districtSelect = document.getElementById('registerDistrict');
+        
+        if (citySelect && districtSelect) {
+            citySelect.addEventListener('change', function() {
+                const selectedCity = this.value;
+                districtSelect.innerHTML = '<option value="">İlçe Seçin</option>';
+                
+                if (selectedCity && turkeyData[selectedCity]) {
+                    turkeyData[selectedCity].forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district;
+                        option.textContent = district;
+                        districtSelect.appendChild(option);
+                    });
+                }
+            });
+            console.log('✅ İl/İlçe dropdown listener\'ları eklendi');
+        }
+    }
+    
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            console.log('📝 KAYIT FORMU GÖNDERİLDİ!');
+            
+            const formData = {
+                name: document.getElementById('registerName').value.trim(),
+                city: document.getElementById('registerCity').value,
+                district: document.getElementById('registerDistrict').value,
+                email: document.getElementById('registerEmail').value.trim(),
+                password: document.getElementById('registerPassword').value
+            };
+            
+            console.log('📋 Form verileri:', { ...formData, password: '***' });
+            
+            if (!formData.name || !formData.email || !formData.password) {
+                console.error('❌ Zorunlu alanlar eksik');
+                alert('Lütfen tüm zorunlu alanları doldurun.');
+                return;
+            }
+            
+            if (!formData.city || !formData.district) {
+                console.warn('⚠️ İl/İlçe eksik, varsayılan değerler atanacak');
+                formData.city = formData.city || 'İstanbul';
+                formData.district = formData.district || 'Kadıköy';
+            }
+            
+            console.log('🎯 Auth modülü import ediliyor...');
+            
+            import('./auth.js').then(module => {
+                console.log('✅ Auth modülü başarıyla yüklendi');
+                console.log('🚀 registerUser fonksiyonu çağrılıyor...');
+                module.registerUser(formData);
+            }).catch(error => {
+                console.error('❌ Auth modülü import hatası:', error);
+                alert('Sistem hatası: Auth modülü yüklenemedi - ' + error.message);
+            });
+        });
+        
+        console.log('✅ Kayıt ol form listener eklendi');
+    } else {
+        console.error('❌ Kayıt ol formu bulunamadı!');
+    }
+    
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            console.log('🔑 GİRİŞ FORMU GÖNDERİLDİ!');
+            
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            
+            console.log('📧 Giriş email:', email);
+            
+            if (!email || !password) {
+                console.error('❌ Email veya şifre eksik');
+                alert('Lütfen e-posta ve şifrenizi girin.');
+                return;
+            }
+            
+            import('./auth.js').then(module => {
+                console.log('✅ Auth modülü yüklendi, giriş başlatılıyor...');
+                module.loginUser(email, password);
+            }).catch(error => {
+                console.error('❌ Auth modülü yüklenemedi:', error);
+                alert('Sistem hatası: Auth modülü yüklenemedi');
+            });
+        });
+        
+        console.log('✅ Giriş yap form listener eklendi');
+    } else {
+        console.error('❌ Giriş yap formu bulunamadı!');
+    }
+    
+    setupCityDistrictDropdowns();
+}
+
 const originalOnload = window.onload;
 window.onload = function () {
+    console.log('🚀 Sayfa yüklendi, sistemler başlatılıyor...');
+
     if (originalOnload) {
         originalOnload();
     }
+
     updateStats();
     updateColumnClickEvents();
     updateRowNumbers();
+
+    console.log('📊 Tablo sistemleri başlatıldı');
+    console.log('🔥 Firebase Auth başlatılıyor...');
+
+    import('./auth.js').then(module => {
+        console.log('✅ Auth modülü yüklendi');
+        module.initializeAuth();
+    }).catch(error => {
+        console.error('❌ Auth modülü yüklenemedi:', error);
+        console.log('⚠️ Uygulama auth olmadan çalışmaya devam ediyor');
+
+        const authButtons = document.querySelector('.auth-buttons');
+        if (authButtons) {
+            authButtons.innerHTML = '<span style="color: red; font-size: 12px;">Auth sistemi yüklenemedi</span>';
+        }
+    });
+
+    setupFormEventListeners();
+    
+    console.log('✅ Tüm sistemler başarıyla başlatıldı');
 }
