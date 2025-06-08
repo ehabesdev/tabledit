@@ -371,7 +371,7 @@ Bu proje **MIT** lisansı altında yayınlanmıştır. Detaylar için `LICENSE` 
 [![GitHub stars](https://img.shields.io/github/stars/ehabesdev/tabledit?style=social)](https://github.com/ehabesdev/tabledit/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/ehabesdev/tabledit?style=social)](https://github.com/ehabesdev/tabledit/network)
 
-**🔥 Made with Firebase & ❤️ for personal use**
+**🔥 Made with ❤️ for personal use**
 
 ---
 
