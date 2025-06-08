@@ -10,7 +10,7 @@
 ![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
 
 
-[🚀 **Canlı Demo**](https://tabledit.firebaseapp.com) | [📚 **Dökümantasyon**](#-detaylı-kullanım-kılavuzu) | [🐛 **Hata Bildir**](https://github.com/ehabesdev/tabledit/issues)
+[🚀 **Canlı Demo**](https://ehabesdev.github.io/tabledit) | [📚 **Dökümantasyon**](#-detaylı-kullanım-kılavuzu) | [🐛 **Hata Bildir**](https://github.com/ehabesdev/tabledit/issues)
 
 </div>
 
@@ -77,7 +77,7 @@
 
 ### 🌐 **Online Kullanım**
 ```
-🔗 https://tabledit.firebaseapp.com
+🔗 https://ehabesdev.github.io/tabledit
 ```
 
 ### 💻 **Yerel Kurulum**
