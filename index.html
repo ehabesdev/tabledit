@@ -155,6 +155,28 @@
                 </div>
             </div>
 
+            <div id="emailVerificationWarning" class="email-verification-warning" style="display: none;">
+                <div class="verification-content">
+                    <div class="verification-icon">📧</div>
+                    <div class="verification-text">
+                        <h4>E-posta Doğrulama Gerekli</h4>
+                        <p>Hesabınızı kullanabilmek için e-posta adresinizi doğrulamanız gerekiyor.</p>
+                        <p>Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.</p>
+                    </div>
+                    <div class="verification-actions">
+                        <button class="btn btn-primary" onclick="checkEmailVerificationStatus()">
+                            🔄 Doğrulamayı Kontrol Et
+                        </button>
+                        <button class="btn btn-secondary" onclick="resendVerificationEmail()">
+                            📧 E-posta Tekrar Gönder
+                        </button>
+                        <button class="btn btn-danger" onclick="logoutUser()">
+                            🚪 Çıkış Yap
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="quick-toolbar">
                 <button class="quick-btn" onclick="saveTableAsExcel()" title="Kaydet">💾</button>
                 <button class="quick-btn" onclick="loadTableFromExcel()" title="Aç">📂</button>
@@ -311,6 +333,56 @@
         </div>
     </div>
 
+    <div id="emailVerificationModal" class="auth-modal">
+        <div class="auth-modal-content">
+            <div class="auth-modal-header">
+                <h3>📧 E-posta Doğrulama</h3>
+                <div class="subtitle">Hesabınızı aktifleştirin</div>
+                <span class="auth-modal-close" onclick="closeEmailVerificationModal()">&times;</span>
+            </div>
+            <div class="auth-modal-body">
+                <div class="email-verification-info">
+                    <div class="verification-icon-large">📧</div>
+                    <h4>Doğrulama E-postası Gönderildi</h4>
+                    <p>
+                        <strong class="verification-email">example@email.com</strong> adresine 
+                        bir doğrulama e-postası gönderdik.
+                    </p>
+                    <p>
+                        Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.
+                        E-posta spam klasörünüzde de olabilir.
+                    </p>
+                    
+                    <div class="verification-steps">
+                        <h5>📋 Yapmanız Gerekenler:</h5>
+                        <ol>
+                            <li>E-posta kutunuzu açın</li>
+                            <li>"Tabledit - E-posta Doğrulama" konulu e-postayı bulun</li>
+                            <li>E-postadaki "E-postamı Doğrula" butonuna tıklayın</li>
+                            <li>Bu sayfaya geri gelip "Doğrulamayı Kontrol Et" butonuna basın</li>
+                        </ol>
+                    </div>
+
+                    <div class="verification-actions">
+                        <button class="btn btn-primary" onclick="checkEmailVerificationStatus()">
+                            🔄 Doğrulamayı Kontrol Et
+                        </button>
+                        <button class="btn btn-secondary" onclick="resendVerificationEmail()">
+                            📧 E-posta Tekrar Gönder
+                        </button>
+                    </div>
+
+                    <div class="verification-note">
+                        <small>
+                            💡 <strong>İpucu:</strong> E-posta gelmiyorsa spam/önemsiz klasörünüzü kontrol edin.
+                            Hala sorun yaşıyorsanız "E-posta Tekrar Gönder" butonunu kullanın.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="registerModal" class="auth-modal">
         <div class="auth-modal-content">
             <div class="auth-modal-header">
@@ -356,7 +428,10 @@
 
                     <div class="auth-form-group">
                         <label for="registerPassword">Şifre *</label>
-                        <input type="password" id="registerPassword" placeholder="En az 6 karakter" required>
+                        <input type="password" id="registerPassword" placeholder="En az 8 karakter, büyük-küçük harf, rakam ve özel karakter" required>
+                        <small class="password-hint">
+                            Şifreniz en az 8 karakter olmalı ve büyük harf, küçük harf, rakam ve özel karakter içermelidir.
+                        </small>
                     </div>
 
                     <button type="submit" id="registerSubmit" class="auth-submit-btn">Hesap Oluştur</button>
@@ -421,6 +496,34 @@
     <script type="module" src="js/auth.js"></script>
     <script type="module" src="js/user-manager.js"></script>
     <script src="js/index.js"></script>
+
+    <script>
+        window.checkEmailVerificationStatus = function() {
+            import('./js/auth.js').then(module => {
+                module.checkEmailVerification();
+            }).catch(error => {
+                console.error('Auth modülü yüklenemedi:', error);
+                alert('Kontrol edilirken hata oluştu. Sayfayı yenileyin.');
+            });
+        }
+
+        window.resendVerificationEmail = function() {
+            import('./js/auth.js').then(module => {
+                module.resendEmailVerification();
+            }).catch(error => {
+                console.error('Auth modülü yüklenemedi:', error);
+                alert('E-posta gönderilirken hata oluştu. Sayfayı yenileyin.');
+            });
+        }
+
+        window.closeEmailVerificationModal = function() {
+            import('./js/auth.js').then(module => {
+                module.closeEmailVerificationModal();
+            }).catch(error => {
+                console.error('Auth modülü yüklenemedi:', error);
+            });
+        }
+    </script>
 
 </body>
 

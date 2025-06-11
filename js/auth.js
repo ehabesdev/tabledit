@@ -1,4 +1,4 @@
-// Authentication İşlemleri
+// Authentication
 
 import { auth, db, securityConfig } from './firebase-config.js';
 
@@ -10,7 +10,8 @@ import {
     signOut,
     onAuthStateChanged,
     updateProfile,
-    sendEmailVerification
+    sendEmailVerification,
+    reload
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { 
     doc, 
@@ -19,10 +20,10 @@ import {
     updateDoc 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-
 const rateLimitCounter = {
     register: 0,
     login: 0,
+    resendVerification: 0,
     lastReset: Date.now()
 };
 
@@ -32,6 +33,7 @@ function checkRateLimit(action, limit = 5) {
     if (now - rateLimitCounter.lastReset > 60000) {
         rateLimitCounter.register = 0;
         rateLimitCounter.login = 0;
+        rateLimitCounter.resendVerification = 0;
         rateLimitCounter.lastReset = now;
     }
     
@@ -112,12 +114,22 @@ export function initializeAuth() {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             console.log('✅ Kullanıcı giriş yaptı:', user.email);
+            console.log('📧 E-posta doğrulama durumu:', user.emailVerified);
+            
             currentUser = user;
+            
+            if (!user.emailVerified) {
+                console.log('⚠️ E-posta henüz doğrulanmamış');
+                showEmailVerificationWarning();
+                return;
+            }
+            
             await loadUserProfile(user);
             showUserInterface();
         } else {
             console.log('❌ Kullanıcı çıkış yaptı veya giriş yapmamış');
             currentUser = null;
+            hideEmailVerificationWarning();
             showAuthInterface();
         }
     });
@@ -126,7 +138,27 @@ export function initializeAuth() {
     console.log('👂 Auth state listener aktif edildi');
 }
 
+function showEmailVerificationWarning() {
+    hideAuthInterface();
+    hideUserInterface();
+    
+    const warningDiv = document.getElementById('emailVerificationWarning');
+    if (warningDiv) {
+        warningDiv.style.display = 'block';
+        console.log('⚠️ E-posta doğrulama uyarısı gösterildi');
+    }
+}
+
+function hideEmailVerificationWarning() {
+    const warningDiv = document.getElementById('emailVerificationWarning');
+    if (warningDiv) {
+        warningDiv.style.display = 'none';
+        console.log('✅ E-posta doğrulama uyarısı gizlendi');
+    }
+}
+
 function showUserInterface() {
+    hideEmailVerificationWarning();
     const authButtons = document.querySelector('.auth-buttons');
     const userProfile = document.querySelector('.user-profile');
     
@@ -141,7 +173,16 @@ function showUserInterface() {
     }
 }
 
+function hideUserInterface() {
+    const userProfile = document.querySelector('.user-profile');
+    if (userProfile) {
+        userProfile.classList.remove('active');
+        console.log('👤 Kullanıcı profili gizlendi');
+    }
+}
+
 function showAuthInterface() {
+    hideEmailVerificationWarning();
     const authButtons = document.querySelector('.auth-buttons');
     const userProfile = document.querySelector('.user-profile');
     
@@ -153,6 +194,14 @@ function showAuthInterface() {
     if (userProfile) {
         userProfile.classList.remove('active');
         console.log('👤 Kullanıcı profili gizlendi');
+    }
+}
+
+function hideAuthInterface() {
+    const authButtons = document.querySelector('.auth-buttons');
+    if (authButtons) {
+        authButtons.style.display = 'none';
+        console.log('🔒 Auth butonları gizlendi');
     }
 }
 
@@ -281,24 +330,32 @@ export async function registerUser(userData) {
             displayName: sanitizedData.name
         });
         
+        try {
+            await sendEmailVerification(user);
+            console.log('📧 E-posta doğrulama gönderildi:', user.email);
+        } catch (verifyError) {
+            console.warn('⚠️ E-posta doğrulama gönderilemedi:', verifyError);
+        }
+        
         const userDocData = {
             name: sanitizedData.name,
             email: sanitizedData.email,
             city: sanitizedData.city,
             district: sanitizedData.district,
             createdAt: new Date(),
-            lastLogin: new Date()
+            lastLogin: new Date(),
+            emailVerified: false
         };
         
         await setDoc(doc(db, 'users', user.uid), userDocData);
         console.log('✅ Kullanıcı Firestore\'a kaydedildi');
         
         hideLoading('register');
-        showAuthSuccess('register', 'Hesabınız başarıyla oluşturuldu! Hoş geldiniz!');
+        showAuthSuccess('register', 'Hesabınız oluşturuldu! Lütfen e-posta adresinizi kontrol edin ve doğrulama linkine tıklayın.');
         
         setTimeout(() => {
             closeAuthModal('register');
-        }, 2000);
+        }, 3000);
         
     } catch (error) {
         console.error('❌ Kayıt hatası:', error);
@@ -344,11 +401,31 @@ export async function loginUser(email, password) {
         const userCredential = await signInWithEmailAndPassword(auth, sanitizedEmail, password);
         const user = userCredential.user;
         
+        console.log('✅ Firebase auth başarılı:', user.uid);
+        console.log('📧 E-posta doğrulama durumu:', user.emailVerified);
+        
+        if (!user.emailVerified) {
+            console.log('❌ E-posta doğrulanmamış, giriş engellendi');
+            
+            await signOut(auth);
+            
+            hideLoading('login');
+            showAuthError('login', 'E-posta adresinizi henüz doğrulamadınız. Lütfen e-posta kutunuzu kontrol edin.');
+            
+            setTimeout(() => {
+                closeAuthModal('login');
+                openEmailVerificationModal(user.email);
+            }, 2000);
+            
+            return;
+        }
+        
         console.log('✅ Giriş başarılı:', user.uid);
         
         try {
             await updateDoc(doc(db, 'users', user.uid), {
-                lastLogin: new Date()
+                lastLogin: new Date(),
+                emailVerified: true
             });
             console.log('✅ Son giriş zamanı güncellendi');
         } catch (updateError) {
@@ -389,6 +466,100 @@ export async function loginUser(email, password) {
         }
         
         showAuthError('login', errorMessage);
+    }
+}
+
+export async function resendEmailVerification() {
+    try {
+        checkRateLimit('resendVerification', 3);
+        
+        if (!currentUser) {
+            throw new Error('Kullanıcı bulunamadı');
+        }
+        
+        await reload(currentUser);
+        
+        if (currentUser.emailVerified) {
+            console.log('✅ E-posta zaten doğrulanmış');
+            location.reload();
+            return;
+        }
+        
+        console.log('📧 E-posta doğrulama yeniden gönderiliyor...');
+        
+        await sendEmailVerification(currentUser);
+        
+        console.log('✅ E-posta doğrulama başarıyla gönderildi');
+        alert('Doğrulama e-postası gönderildi! Lütfen e-posta kutunuzu kontrol edin.');
+        
+    } catch (error) {
+        console.error('❌ E-posta doğrulama gönderme hatası:', error);
+        
+        let errorMessage = 'E-posta gönderilirken hata oluştu.';
+        
+        switch (error.code) {
+            case 'auth/too-many-requests':
+                errorMessage = 'Çok fazla e-posta gönderildi. Lütfen daha sonra tekrar deneyin.';
+                break;
+            default:
+                errorMessage = error.message || errorMessage;
+        }
+        
+        alert(errorMessage);
+    }
+}
+
+export async function checkEmailVerification() {
+    try {
+        if (!currentUser) {
+            console.log('❌ Kullanıcı bulunamadı');
+            return;
+        }
+        
+        console.log('🔄 E-posta doğrulama durumu kontrol ediliyor...');
+        
+        await reload(currentUser);
+        
+        if (currentUser.emailVerified) {
+            console.log('✅ E-posta doğrulandı! Sayfa yenileniyor...');
+            
+            try {
+                await updateDoc(doc(db, 'users', currentUser.uid), {
+                    emailVerified: true,
+                    verifiedAt: new Date()
+                });
+            } catch (updateError) {
+                console.warn('⚠️ Firestore güncelleme hatası:', updateError);
+            }
+            location.reload();
+        } else {
+            console.log('⚠️ E-posta henüz doğrulanmamış');
+            alert('E-posta henüz doğrulanmamış. Lütfen e-posta kutunuzu kontrol edin.');
+        }
+        
+    } catch (error) {
+        console.error('❌ E-posta doğrulama kontrol hatası:', error);
+        alert('Kontrol sırasında hata oluştu: ' + error.message);
+    }
+}
+
+function openEmailVerificationModal(email) {
+    const modal = document.getElementById('emailVerificationModal');
+    if (modal) {
+        const emailSpan = modal.querySelector('.verification-email');
+        if (emailSpan) {
+            emailSpan.textContent = email;
+        }
+        modal.classList.add('show');
+        console.log('📧 E-posta doğrulama modalı açıldı');
+    }
+}
+
+export function closeEmailVerificationModal() {
+    const modal = document.getElementById('emailVerificationModal');
+    if (modal) {
+        modal.classList.remove('show');
+        console.log('📧 E-posta doğrulama modalı kapatıldı');
     }
 }
 
@@ -607,7 +778,7 @@ export function getCurrentUser() {
 }
 
 export function isUserLoggedIn() {
-    return currentUser !== null;
+    return currentUser !== null && currentUser.emailVerified;
 }
 
 document.addEventListener('DOMContentLoaded', function() {
