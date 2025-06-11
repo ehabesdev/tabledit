@@ -517,29 +517,42 @@ export async function checkEmailVerification() {
         }
         
         console.log('🔄 E-posta doğrulama durumu kontrol ediliyor...');
-        
         await reload(currentUser);
-        
+        console.log('📧 Güncel doğrulama durumu:', currentUser.emailVerified);
         if (currentUser.emailVerified) {
             console.log('✅ E-posta doğrulandı! Sayfa yenileniyor...');
-            
             try {
                 await updateDoc(doc(db, 'users', currentUser.uid), {
                     emailVerified: true,
                     verifiedAt: new Date()
                 });
+                console.log('✅ Firestore güncellendi');
             } catch (updateError) {
                 console.warn('⚠️ Firestore güncelleme hatası:', updateError);
             }
+            alert('🎉 E-posta başarıyla doğrulandı! Hoş geldiniz!');
             location.reload();
         } else {
             console.log('⚠️ E-posta henüz doğrulanmamış');
-            alert('E-posta henüz doğrulanmamış. Lütfen e-posta kutunuzu kontrol edin.');
+            alert('⚠️ E-posta henüz doğrulanmamış. Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.');
         }
         
     } catch (error) {
         console.error('❌ E-posta doğrulama kontrol hatası:', error);
-        alert('Kontrol sırasında hata oluştu: ' + error.message);
+        
+        let errorMessage = 'Kontrol sırasında hata oluştu.';
+        
+        switch (error.code) {
+            case 'auth/network-request-failed':
+                errorMessage = 'İnternet bağlantınızı kontrol edin.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Çok fazla deneme. Lütfen biraz bekleyin.';
+                break;
+            default:
+                errorMessage = error.message || errorMessage;
+        }
+        alert('❌ ' + errorMessage);
     }
 }
 
