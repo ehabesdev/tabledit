@@ -4,7 +4,14 @@ let selectedColumn = null;
 let colorTargetType = '';
 let isMultiDeleteModeActive = false;
 let authModuleLoaded = false;
+let currentFileId = null;
+let currentFileName = null;
+let autoSaveInterval = null;
+let autoSaveEnabled = false;
+let hasUnsavedChanges = false;
+let lastSaveTime = null;
 const CHECKBOX_COLUMN_CLASS = 'row-checkbox-cell';
+const AUTO_SAVE_INTERVAL = 30000;
 
 const turkeyLocationData = {
     'İstanbul': ['Kadıköy', 'Beşiktaş', 'Şişli', 'Bakırköy', 'Üsküdar', 'Fatih', 'Beyoğlu', 'Kartal', 'Maltepe', 'Pendik', 'Ümraniye', 'Zeytinburnu'],
@@ -61,6 +68,44 @@ function toggleStatsPanel() {
 }
 
 async function saveTableAsExcel() {
+    try {
+        const authLoaded = await loadAuthModule();
+        if (!authLoaded || !window.authModule || !window.authModule.isUserLoggedIn()) {
+            await saveAsExcelFile();
+            return;
+        }
+
+        const userManager = await import('./user-manager.js');
+        const tableData = userManager.serializeTableData();
+        
+        let fileName = currentFileName || `Tabledit_${new Date().toISOString().slice(0, 10)}`;
+        
+        if (currentFileId) {
+            await userManager.updateUserFile(currentFileId, fileName, tableData);
+            showNotification('Dosya başarıyla güncellendi', 'success');
+        } else {
+            fileName = prompt('Dosya adını girin:', fileName);
+            if (!fileName) return;
+            
+            const fileId = await userManager.saveUserTable(fileName, tableData);
+            currentFileId = fileId;
+            currentFileName = fileName;
+            showNotification('Dosya başarıyla kaydedildi', 'success');
+        }
+        
+        hasUnsavedChanges = false;
+        lastSaveTime = new Date();
+        updateSaveStatus();
+        
+    } catch (error) {
+        console.error('❌ Dosya kaydetme hatası:', error);
+        showNotification('Dosya kaydedilirken hata oluştu: ' + error.message, 'error');
+        
+        await saveAsExcelFile();
+    }
+}
+
+async function saveAsExcelFile() {
     try {
         if (typeof ExcelJS === 'undefined') {
             throw new Error('ExcelJS kütüphanesi yüklenmemiş');
@@ -174,16 +219,16 @@ async function saveTableAsExcel() {
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `Tabledit_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        link.download = `${currentFileName || 'Tabledit'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         
-        console.log('✅ Excel dosyası başarıyla kaydedildi');
+        console.log('✅ Excel dosyası başarıyla indirildi');
 
     } catch (error) {
-        console.error('❌ Excel kaydetme hatası:', error);
-        alert('Dosya kaydedilirken bir hata oluştu: ' + error.message);
+        console.error('❌ Excel indirme hatası:', error);
+        alert('Dosya indirilirken bir hata oluştu: ' + error.message);
     }
 }
 
@@ -216,6 +261,32 @@ function loadTableFromExcel() {
                     }
 
                     loadExcelData(worksheet);
+                    
+                    const fileName = file.name.replace(/\.[^/.]+$/, "");
+                    const authLoaded = await loadAuthModule();
+                    
+                    if (authLoaded && window.authModule && window.authModule.isUserLoggedIn()) {
+                        try {
+                            const userManager = await import('./user-manager.js');
+                            const tableData = userManager.serializeTableData();
+                            
+                            const fileId = await userManager.saveUserTable(fileName, tableData);
+                            currentFileId = fileId;
+                            currentFileName = fileName;
+                            
+                            showNotification(`"${fileName}" dosyası başarıyla yüklendi ve kaydedildi`, 'success');
+                            hasUnsavedChanges = false;
+                            lastSaveTime = new Date();
+                            updateSaveStatus();
+                            
+                        } catch (saveError) {
+                            console.warn('Dosya otomatik kaydedilemedi:', saveError);
+                            showNotification(`Dosya yüklendi ancak kaydedilemedi: ${saveError.message}`, 'warning');
+                        }
+                    } else {
+                        showNotification('Dosya yüklendi. Kaydedilmesi için giriş yapmanız gerekir.', 'info');
+                    }
+                    
                     console.log('✅ Excel dosyası başarıyla yüklendi');
 
                 } catch (error) {
@@ -305,6 +376,7 @@ function loadExcelData(worksheet) {
     updateStats();
     updateColumnClickEvents();
     updateRowNumbers();
+    markAsChanged();
 }
 
 function argbToHex(argb) {
@@ -545,6 +617,8 @@ function applyColor(color) {
     if (palette) {
         palette.classList.remove('show');
     }
+
+    markAsChanged();
 }
 
 function clearCellFormat() {
@@ -577,6 +651,8 @@ function clearCellFormat() {
     } else {
         alert('Lütfen önce formatını temizlemek istediğiniz bir hücre, satır veya sütun seçin.');
     }
+
+    markAsChanged();
 }
 
 function clearSelection(updateInfo = true) {
@@ -669,6 +745,7 @@ function addRow() {
     newRow.onclick = function () { selectRow(this); };
     updateStats();
     updateRowNumbers();
+    markAsChanged();
 }
 
 function addColumn() {
@@ -731,6 +808,7 @@ function confirmAddColumn() {
     closeModal('columnModal');
     updateStats();
     updateColumnClickEvents();
+    markAsChanged();
 }
 
 function deleteSelectedRow() {
@@ -740,6 +818,7 @@ function deleteSelectedRow() {
         updateStats();
         updateRowNumbers();
         clearSelection();
+        markAsChanged();
     } else {
         alert('Lütfen silmek istediğiniz satırı seçin.');
     }
@@ -771,6 +850,7 @@ function deleteSelectedColumn() {
     updateColumnClickEvents();
     clearSelection();
     updateRowNumbers();
+    markAsChanged();
 }
 
 function makeHeaderEditable(thElement) {
@@ -809,6 +889,7 @@ function makeHeaderEditable(thElement) {
 
         thElement.onclick = (event) => selectColumn(thElement, event, visualIndexOfTh);
         thElement.ondblclick = () => makeHeaderEditable(thElement);
+        markAsChanged();
     };
 
     const cancelEdit = () => {
@@ -942,6 +1023,7 @@ function clearTable() {
         updateStats();
         clearSelection();
         updateColumnClickEvents();
+        markAsChanged();
     }
 }
 
@@ -1300,6 +1382,7 @@ function confirmDeleteSelectedRows() {
         toggleMultiDeleteMode();
         updateStats();
         updateRowNumbers();
+        markAsChanged();
     }
 }
 
@@ -1340,11 +1423,284 @@ window.openProfile = function () {
 }
 
 window.openMyFiles = function () {
-    alert('Dosyalarım sayfası yakında gelecek!');
+    window.location.href = './files.html';
 }
 
 window.createNewFile = function () {
-    alert('Yeni dosya özelliği yakında gelecek!');
+    if (hasUnsavedChanges) {
+        if (confirm('Kaydedilmemiş değişiklikler var. Yeni dosya oluşturmak istediğinizden emin misiniz?')) {
+            createNewTable();
+        }
+    } else {
+        createNewTable();
+    }
+}
+
+function createNewTable() {
+    currentFileId = null;
+    currentFileName = null;
+    hasUnsavedChanges = false;
+    
+    const table = document.getElementById('dynamicTable');
+    const tbody = table.querySelector('tbody');
+    const theadTr = table.querySelector('thead tr');
+    
+    if (tbody) tbody.innerHTML = '';
+    if (theadTr) {
+        theadTr.innerHTML = `
+            <th onclick="selectColumn(0)" style="background: #2c3e50; color: white;">ID</th>
+            <th onclick="selectColumn(1)" style="background: #2c3e50; color: white;">Ad Soyad</th>
+            <th onclick="selectColumn(2)" style="background: #2c3e50; color: white;">Mevki</th>
+            <th onclick="selectColumn(3)" style="background: #2c3e50; color: white;">Departman</th>
+            <th onclick="selectColumn(4)" style="background: #2c3e50; color: white;">Telefon</th>
+        `;
+    }
+    
+    if (tbody) {
+        const sampleRows = [
+            ['1', 'Ahmet YILMAZ', 'Başkan', 'Yönetim', '0532 123 45 67'],
+            ['2', 'Turan KAYA', 'Sekreter', 'Yönetim', '0533 234 56 78'],
+            ['3', 'Mehmet ALİ', 'Üye', 'Etkinlik', '0534 345 67 89']
+        ];
+        
+        sampleRows.forEach(rowData => {
+            const tr = tbody.insertRow();
+            tr.onclick = function () { selectRow(this); };
+            tr.style.cursor = 'pointer';
+            
+            rowData.forEach((cellValue, index) => {
+                const td = tr.insertCell();
+                td.onclick = function (event) { selectCell(this, event); };
+                td.style.cursor = 'pointer';
+                td.innerHTML = `<input type="text" class="editable" value="${cellValue}" ${index === 0 ? 'readonly' : ''}>`;
+            });
+        });
+    }
+    
+    updateStats();
+    updateColumnClickEvents();
+    updateRowNumbers();
+    clearSelection();
+    updateSaveStatus();
+    
+    showNotification('Yeni dosya oluşturuldu', 'success');
+}
+
+async function loadFileFromUrl() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileId = urlParams.get('file');
+        
+        if (!fileId) return;
+        
+        const sessionData = sessionStorage.getItem('loadFileData');
+        sessionStorage.removeItem('loadFileData');
+        
+        if (sessionData) {
+            const fileData = JSON.parse(sessionData);
+            currentFileId = fileId;
+            currentFileName = fileData.name;
+            
+            const userManager = await import('./user-manager.js');
+            userManager.deserializeTableData(fileData.data);
+            
+            hasUnsavedChanges = false;
+            lastSaveTime = new Date(fileData.updatedAt);
+            updateSaveStatus();
+            
+            showNotification(`"${fileData.name}" dosyası açıldı`, 'success');
+            
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
+    } catch (error) {
+        console.error('URL\'den dosya yüklenemedi:', error);
+        showNotification('Dosya açılırken hata oluştu: ' + error.message, 'error');
+    }
+}
+
+function startAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+    }
+    
+    autoSaveInterval = setInterval(async () => {
+        const authLoaded = await loadAuthModule();
+        if (!authLoaded || !window.authModule || !window.authModule.isUserLoggedIn()) {
+            return;
+        }
+        
+        if (!hasUnsavedChanges || !currentFileId) {
+            return;
+        }
+        
+        try {
+            const userManager = await import('./user-manager.js');
+            const tableData = userManager.serializeTableData();
+            
+            await userManager.updateUserFile(currentFileId, currentFileName, tableData);
+            
+            hasUnsavedChanges = false;
+            lastSaveTime = new Date();
+            updateSaveStatus();
+            
+            showNotification('Otomatik kayıt tamamlandı', 'info', 2000);
+            
+        } catch (error) {
+            console.error('Otomatik kayıt hatası:', error);
+            showNotification('Otomatik kayıt başarısız: ' + error.message, 'warning', 3000);
+        }
+    }, AUTO_SAVE_INTERVAL);
+    
+    autoSaveEnabled = true;
+    console.log('Otomatik kayıt başlatıldı (30 saniye aralıklarla)');
+}
+
+function stopAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+    }
+    autoSaveEnabled = false;
+    console.log('Otomatik kayıt durduruldu');
+}
+
+function markAsChanged() {
+    hasUnsavedChanges = true;
+    updateSaveStatus();
+}
+
+function updateSaveStatus() {
+    const statusEl = document.getElementById('saveStatus');
+    if (!statusEl) {
+        createSaveStatusIndicator();
+        return;
+    }
+    
+    if (hasUnsavedChanges) {
+        statusEl.innerHTML = '● Kaydedilmemiş değişiklikler';
+        statusEl.className = 'save-status unsaved';
+    } else if (lastSaveTime) {
+        const timeAgo = formatTimeAgo(lastSaveTime);
+        statusEl.innerHTML = `✓ ${timeAgo} kaydedildi`;
+        statusEl.className = 'save-status saved';
+    } else {
+        statusEl.innerHTML = 'Yeni dosya';
+        statusEl.className = 'save-status new';
+    }
+}
+
+function createSaveStatusIndicator() {
+    const toolbar = document.querySelector('.quick-toolbar');
+    if (!toolbar) return;
+    
+    const statusEl = document.createElement('div');
+    statusEl.id = 'saveStatus';
+    statusEl.className = 'save-status new';
+    statusEl.innerHTML = 'Yeni dosya';
+    
+    const separatorEl = document.createElement('div');
+    separatorEl.className = 'toolbar-separator';
+    
+    toolbar.appendChild(separatorEl);
+    toolbar.appendChild(statusEl);
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        .save-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .save-status.saved {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .save-status.unsaved {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .save-status.new {
+            background: #e2e3e5;
+            color: #495057;
+            border: 1px solid #d6d8db;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function formatTimeAgo(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Az önce';
+    if (diffMins < 60) return `${diffMins} dakika önce`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} saat önce`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays} gün önce`;
+    
+    return date.toLocaleDateString('tr-TR');
+}
+
+function showNotification(message, type = 'info', duration = 4000) {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    const colors = {
+        success: 'linear-gradient(45deg, #27ae60, #229954)',
+        error: 'linear-gradient(45deg, #e74c3c, #c0392b)',
+        warning: 'linear-gradient(45deg, #f39c12, #e67e22)',
+        info: 'linear-gradient(45deg, #3498db, #2980b9)'
+    };
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${colors[type] || colors.info};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 9999;
+        font-size: 14px;
+        font-weight: 500;
+        max-width: 350px;
+        word-break: break-word;
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    if (!document.querySelector('#notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => notification.remove(), 300);
+    }, duration);
 }
 
 window.resendVerificationEmail = async function() {
@@ -1529,11 +1885,28 @@ function initializeApplication() {
         updateRowNumbers();
         initializeEventListeners();
         setupFormEventListeners();
+        setupTableChangeListeners();
+        createSaveStatusIndicator();
         
         loadAuthModule().then(authLoaded => {
             if (authLoaded && window.authModule) {
                 window.authModule.initializeAuth();
                 console.log('✅ Auth sistemi başlatıldı');
+                
+                window.authModule.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        const { checkUserVerificationStatus } = await import('./email-verification.js');
+                        const verificationStatus = await checkUserVerificationStatus(user.uid);
+                        
+                        if (verificationStatus.verified) {
+                            setTimeout(() => {
+                                startAutoSave();
+                            }, 2000);
+                        }
+                    } else {
+                        stopAutoSave();
+                    }
+                });
             } else {
                 console.error('❌ Auth sistemi yüklenemedi');
                 const authButtons = document.querySelector('.auth-buttons');
@@ -1543,12 +1916,14 @@ function initializeApplication() {
             }
         });
         
+        loadFileFromUrl();
+        
         const urlParams = new URLSearchParams(window.location.search);
         const verifiedStatus = urlParams.get('verified');
         
         if (verifiedStatus === 'success') {
             setTimeout(() => {
-                alert('🎉 E-posta doğrulama başarılı! Hoş geldiniz!\n\nArtık Tabledit\'in tüm özelliklerini kullanabilirsiniz.');
+                showNotification('🎉 E-posta doğrulama başarılı! Hoş geldiniz!\n\nArtık Tabledit\'in tüm özelliklerini kullanabilirsiniz.', 'success', 5000);
                 const newUrl = window.location.href.split('?')[0];
                 window.history.replaceState({}, document.title, newUrl);
             }, 1000);
@@ -1561,6 +1936,42 @@ function initializeApplication() {
     }
 }
 
+function setupTableChangeListeners() {
+    const table = document.getElementById('dynamicTable');
+    if (!table) return;
+    
+    const observer = new MutationObserver((mutations) => {
+        let hasRelevantChanges = false;
+        
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList' || 
+                (mutation.type === 'attributes' && 
+                 (mutation.attributeName === 'style' || mutation.attributeName === 'value'))) {
+                hasRelevantChanges = true;
+            }
+        });
+        
+        if (hasRelevantChanges) {
+            markAsChanged();
+        }
+    });
+    
+    observer.observe(table, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'value']
+    });
+    
+    table.addEventListener('input', () => {
+        markAsChanged();
+    });
+    
+    table.addEventListener('change', () => {
+        markAsChanged();
+    });
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeApplication);
 } else {
@@ -1569,4 +1980,18 @@ if (document.readyState === 'loading') {
 
 window.addEventListener('load', () => {
     console.log('📄 Sayfa tamamen yüklendi');
+});
+
+window.addEventListener('beforeunload', (event) => {
+    stopAutoSave();
+    
+    if (hasUnsavedChanges) {
+        const message = 'Kaydedilmemiş değişiklikler var. Sayfayı kapatmak istediğinizden emin misiniz?';
+        event.returnValue = message;
+        return message;
+    }
+});
+
+window.addEventListener('pagehide', () => {
+    stopAutoSave();
 });

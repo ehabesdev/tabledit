@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dosyalarım - Tabledit</title>
+    <link rel="stylesheet" type="text/css" href="css/files.css">
+    <link rel="stylesheet" type="text/css" href="css/auth.css">
+    <link rel="icon" type="image/png" href="img/favicon.png">
+</head>
+<body>
+    <div class="container">
+        <div class="top-sticky-section">
+            <div class="header">
+                <img src="img/agd_logo.png" alt="Firma Logosu" class="header-logo">
+            </div>
+            
+            <div class="navbar">
+                <div class="nav-left">
+                    <button class="nav-button back-btn" onclick="goToMainPage()">
+                        <span class="icon">⬅️</span>
+                        <span class="text">Ana Sayfa</span>
+                    </button>
+                    <div class="nav-separator"></div>
+                    <button class="nav-button" onclick="refreshFiles()">
+                        <span class="icon">🔄</span>
+                        <span class="text">Yenile</span>
+                    </button>
+                    <button class="nav-button" onclick="showUploadModal()">
+                        <span class="icon">📤</span>
+                        <span class="text">Yükle</span>
+                    </button>
+                    <button class="nav-button" onclick="createNewFile()">
+                        <span class="icon">📄</span>
+                        <span class="text">Yeni Dosya</span>
+                    </button>
+                </div>
+                
+                <div class="navbar-right">
+                    <div class="search-container">
+                        <input type="text" id="searchInput" placeholder="Dosya ara..." class="search-input">
+                        <button class="search-btn" onclick="searchFiles()">🔍</button>
+                    </div>
+                    
+                    <div class="user-profile active">
+                        <div class="user-avatar" onclick="toggleUserDropdown()">??</div>
+                        <div class="user-name" onclick="toggleUserDropdown()">Yükleniyor...</div>
+                        
+                        <div class="user-dropdown">
+                            <div class="dropdown-header">
+                                <div class="user-name">Yükleniyor...</div>
+                                <div class="user-email">email@example.com</div>
+                            </div>
+                            <button class="menu-item" onclick="openProfile()">
+                                <span class="icon">👤</span>
+                                <span class="text">Profil</span>
+                            </button>
+                            <button class="menu-item active">
+                                <span class="icon">📁</span>
+                                <span class="text">Dosyalarım</span>
+                            </button>
+                            <button class="menu-item" onclick="goToMainPage()">
+                                <span class="icon">📊</span>
+                                <span class="text">Tablo Editörü</span>
+                            </button>
+                            <button class="menu-item logout" onclick="logoutUser()">
+                                <span class="icon">🚪</span>
+                                <span class="text">Çıkış Yap</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="emailVerificationWarning" class="email-verification-warning" style="display: none;">
+                <div class="verification-content">
+                    <div class="verification-icon">📧</div>
+                    <div class="verification-text">
+                        <h4>E-posta Doğrulama Gerekli</h4>
+                        <p>Dosyalarınızı kaydetmek için e-posta adresinizi doğrulamanız gerekiyor.</p>
+                    </div>
+                    <div class="verification-actions">
+                        <button class="btn btn-primary" onclick="checkEmailVerificationStatus()">
+                            🔄 Doğrulamayı Kontrol Et
+                        </button>
+                        <button class="btn btn-secondary" onclick="resendVerificationEmail()">
+                            📧 E-posta Tekrar Gönder
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="files-toolbar">
+                <div class="toolbar-left">
+                    <div class="files-count">
+                        <span id="filesCount">0</span> dosya
+                    </div>
+                    <div class="storage-info">
+                        <span id="storageUsed">0 KB</span> kullanılıyor
+                    </div>
+                </div>
+                
+                <div class="toolbar-right">
+                    <div class="view-toggle">
+                        <button class="view-btn active" data-view="grid" onclick="setViewMode('grid')">⊞</button>
+                        <button class="view-btn" data-view="list" onclick="setViewMode('list')">☰</button>
+                    </div>
+                    
+                    <div class="sort-options">
+                        <select id="sortSelect" onchange="sortFiles(this.value)">
+                            <option value="updated-desc">Son Güncelleme ↓</option>
+                            <option value="updated-asc">Son Güncelleme ↑</option>
+                            <option value="name-asc">İsim A-Z</option>
+                            <option value="name-desc">İsim Z-A</option>
+                            <option value="size-desc">Boyut Büyük-Küçük</option>
+                            <option value="size-asc">Boyut Küçük-Büyük</option>
+                            <option value="created-desc">Oluşturma Tarihi ↓</option>
+                            <option value="created-asc">Oluşturma Tarihi ↑</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="files-container">
+            <div id="loadingFiles" class="loading-state">
+                <div class="loading-spinner"></div>
+                <p>Dosyalar yükleniyor...</p>
+            </div>
+            
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">📁</div>
+                <h3>Henüz dosyanız yok</h3>
+                <p>İlk dosyanızı oluşturmak için aşağıdaki seçenekleri kullanabilirsiniz:</p>
+                <div class="empty-actions">
+                    <button class="btn btn-primary" onclick="createNewFile()">
+                        📄 Yeni Dosya Oluştur
+                    </button>
+                    <button class="btn btn-secondary" onclick="showUploadModal()">
+                        📤 Excel Dosyası Yükle
+                    </button>
+                </div>
+            </div>
+            
+            <div id="filesGrid" class="files-grid" style="display: none;">
+            </div>
+            
+            <div id="filesList" class="files-list" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortFiles('name-asc')">Dosya Adı</th>
+                            <th onclick="sortFiles('size-desc')">Boyut</th>
+                            <th onclick="sortFiles('updated-desc')">Son Güncelleme</th>
+                            <th onclick="sortFiles('created-desc')">Oluşturma</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="filesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Excel Dosyası Yükle</h3>
+                <span class="close" onclick="closeUploadModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📤</div>
+                    <p>Excel dosyanızı buraya sürükleyip bırakın</p>
+                    <p>veya</p>
+                    <button class="btn btn-primary" onclick="selectFile()">Dosya Seç</button>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                </div>
+                <div class="upload-info">
+                    <small>Desteklenen formatlar: .xlsx, .xls</small>
+                    <small>Maksimum boyut: 1 MB</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="fileActionsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="actionModalTitle">Dosya İşlemleri</h3>
+                <span class="close" onclick="closeFileActionsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="file-info">
+                    <div class="file-icon">📊</div>
+                    <div class="file-details">
+                        <h4 id="actionFileName">Dosya Adı</h4>
+                        <p>Boyut: <span id="actionFileSize">0 KB</span></p>
+                        <p>Son Güncelleme: <span id="actionFileDate">Tarih</span></p>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="openFile()">
+                        📊 Dosyayı Aç
+                    </button>
+                    <button class="btn btn-secondary" onclick="renameFile()">
+                        ✏️ Yeniden Adlandır
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadFile()">
+                        💾 İndir
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteFile()">
+                        🗑️ Sil
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="renameModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Dosya Adını Değiştir</h3>
+                <span class="close" onclick="closeRenameModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newFileName">Yeni Dosya Adı:</label>
+                    <input type="text" id="newFileName" placeholder="Dosya adını girin">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="confirmRename()">Kaydet</button>
+                    <button class="btn btn-secondary" onclick="closeRenameModal()">İptal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/user-manager.js"></script>
+    <script type="module" src="js/files.js"></script>
+</body>
+</html>
