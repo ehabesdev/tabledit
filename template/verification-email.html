@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>E-posta Doğrulama - Tabledit</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
         * {
             margin: 0;
             padding: 0;
@@ -13,72 +14,54 @@
         }
         
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
             line-height: 1.7;
             color: #2d3748;
-            background: #f7fafc;
-            margin: 0;
-            padding: 0;
-            width: 100% !important;
-            min-width: 100%;
-            -webkit-text-size-adjust: 100%;
-            -ms-text-size-adjust: 100%;
-        }
-        
-        table {
-            border-collapse: collapse;
-            mso-table-lspace: 0pt;
-            mso-table-rspace: 0pt;
-        }
-        
-        img {
-            border: 0;
-            height: auto;
-            line-height: 100%;
-            outline: none;
-            text-decoration: none;
-            -ms-interpolation-mode: bicubic;
-            max-width: 100%;
-        }
-        
-        .email-wrapper {
-            width: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
             padding: 20px 0;
         }
         
-        .email-container {
+        .email-wrapper {
             max-width: 680px;
             margin: 0 auto;
-            background: #ffffff;
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
             overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            box-shadow: 
+                0 32px 64px rgba(0, 0, 0, 0.15),
+                0 16px 32px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .email-header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 75%, #533483 100%);
-            padding: 50px 40px;
-            text-align: center;
             position: relative;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 75%, #533483 100%);
+            padding: 60px 40px;
+            text-align: center;
             overflow: hidden;
         }
         
         .email-header::before {
             content: '';
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: rotate 20s linear infinite;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+            animation: gradientShift 6s ease-in-out infinite alternate;
         }
         
-        @keyframes rotate {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @keyframes gradientShift {
+            0% { transform: translateX(0) translateY(0) scale(1); }
+            100% { transform: translateX(-20px) translateY(-10px) scale(1.05); }
         }
         
         .logo-container {
@@ -88,50 +71,105 @@
         }
         
         .logo {
-            width: 90px;
-            height: 90px;
+            width: 80px;
+            height: 80px;
             background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 24px;
+            border-radius: 20px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 42px;
+            font-size: 36px;
             color: white;
             font-weight: 800;
-            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
+            border: 3px solid rgba(255, 255, 255, 0.2);
         }
         
         .header-title {
             position: relative;
             z-index: 2;
             color: #ffffff;
-            font-size: 48px;
+            font-size: 42px;
             font-weight: 800;
             margin-bottom: 16px;
             text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, #ffffff, #e2e8f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         .header-subtitle {
             position: relative;
             z-index: 2;
             color: rgba(255, 255, 255, 0.9);
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 500;
+            opacity: 0.95;
+        }
+        
+        .floating-shapes {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        
+        .shape {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 15s infinite linear;
+        }
+        
+        .shape:nth-child(1) {
+            width: 100px;
+            height: 100px;
+            top: 20%;
+            left: 10%;
+            animation-duration: 20s;
+            animation-delay: 0s;
+        }
+        
+        .shape:nth-child(2) {
+            width: 60px;
+            height: 60px;
+            top: 60%;
+            right: 15%;
+            animation-duration: 15s;
+            animation-delay: 5s;
+        }
+        
+        .shape:nth-child(3) {
+            width: 80px;
+            height: 80px;
+            bottom: 20%;
+            left: 20%;
+            animation-duration: 18s;
+            animation-delay: 2s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.1; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.3; }
         }
         
         .email-content {
-            padding: 60px 40px;
+            padding: 50px 40px;
+            position: relative;
         }
         
         .welcome-section {
             text-align: center;
-            margin-bottom: 50px;
+            margin-bottom: 40px;
         }
         
         .welcome-emoji {
-            font-size: 80px;
-            margin-bottom: 32px;
+            font-size: 64px;
+            margin-bottom: 24px;
             display: block;
             animation: bounce 2s infinite;
         }
@@ -142,9 +180,9 @@
         }
         
         .welcome-title {
-            font-size: 36px;
+            font-size: 32px;
             color: #1a202c;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             font-weight: 700;
             background: linear-gradient(135deg, #667eea, #764ba2);
             -webkit-background-clip: text;
@@ -153,32 +191,35 @@
         }
         
         .welcome-message {
-            font-size: 20px;
+            font-size: 18px;
             line-height: 1.8;
             color: #4a5568;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         .user-email-badge {
             display: inline-block;
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
-            padding: 12px 28px;
+            padding: 12px 24px;
             border-radius: 50px;
-            font-weight: 700;
-            font-size: 18px;
+            font-weight: 600;
+            font-size: 16px;
             box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
             border: 2px solid rgba(255, 255, 255, 0.2);
             margin: 0 8px;
         }
         
         .cta-section {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f7 100%);
-            border-radius: 24px;
-            padding: 50px 40px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 20px;
+            padding: 40px 30px;
             text-align: center;
-            margin: 50px 0;
-            border: 3px solid rgba(102, 126, 234, 0.1);
+            margin: 40px 0;
+            border: 2px solid rgba(102, 126, 234, 0.1);
             position: relative;
             overflow: hidden;
         }
@@ -189,7 +230,7 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 6px;
+            height: 4px;
             background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #667eea);
             background-size: 200% 100%;
             animation: shimmer 3s ease-in-out infinite;
@@ -201,16 +242,16 @@
         }
         
         .cta-title {
-            font-size: 28px;
+            font-size: 24px;
             color: #2d3748;
             margin-bottom: 20px;
             font-weight: 700;
         }
         
         .cta-subtitle {
-            font-size: 18px;
+            font-size: 16px;
             color: #718096;
-            margin-bottom: 40px;
+            margin-bottom: 35px;
             line-height: 1.6;
         }
         
@@ -219,14 +260,16 @@
             background: linear-gradient(135deg, #48bb78, #38a169);
             color: white;
             text-decoration: none;
-            padding: 22px 60px;
-            border-radius: 20px;
-            font-size: 20px;
+            padding: 18px 48px;
+            border-radius: 16px;
+            font-size: 18px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            box-shadow: 0 15px 50px rgba(72, 187, 120, 0.4);
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            letter-spacing: 1px;
+            box-shadow: 
+                0 12px 40px rgba(72, 187, 120, 0.4),
+                0 8px 16px rgba(72, 187, 120, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
             overflow: hidden;
@@ -239,13 +282,15 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            transition: left 0.6s;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
         }
         
         .verify-button:hover {
-            transform: translateY(-6px) scale(1.05);
-            box-shadow: 0 25px 80px rgba(72, 187, 120, 0.5);
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 
+                0 20px 60px rgba(72, 187, 120, 0.5),
+                0 12px 24px rgba(72, 187, 120, 0.3);
         }
         
         .verify-button:hover::before {
@@ -253,14 +298,14 @@
         }
         
         .features-section {
-            margin: 60px 0;
+            margin: 50px 0;
         }
         
         .features-title {
             text-align: center;
-            font-size: 32px;
+            font-size: 28px;
             color: #2d3748;
-            margin-bottom: 50px;
+            margin-bottom: 40px;
             font-weight: 700;
             background: linear-gradient(135deg, #667eea, #764ba2);
             -webkit-background-clip: text;
@@ -269,133 +314,135 @@
         }
         
         .features-grid {
-            display: table;
-            width: 100%;
-            table-layout: fixed;
-        }
-        
-        .features-row {
-            display: table-row;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 30px;
         }
         
         .feature-card {
-            display: table-cell;
-            width: 25%;
-            vertical-align: top;
-            padding: 0 15px;
-        }
-        
-        .feature-inner {
             background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
             border-radius: 20px;
-            padding: 40px 30px;
+            padding: 30px 24px;
             text-align: center;
             border: 2px solid rgba(102, 126, 234, 0.1);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s ease;
-            height: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            overflow: hidden;
         }
         
-        .feature-inner:hover {
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
             transform: translateY(-8px);
             border-color: rgba(102, 126, 234, 0.3);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+        }
+        
+        .feature-card:hover::before {
+            transform: scaleX(1);
         }
         
         .feature-icon {
-            font-size: 56px;
-            margin-bottom: 24px;
+            font-size: 48px;
+            margin-bottom: 20px;
             display: block;
-            filter: drop-shadow(0 8px 16px rgba(102, 126, 234, 0.2));
+            filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.2));
         }
         
         .feature-title {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 700;
             color: #2d3748;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         
         .feature-description {
-            font-size: 16px;
+            font-size: 15px;
             color: #718096;
             line-height: 1.6;
         }
         
         .info-section {
-            background: linear-gradient(135deg, #fef5e7 0%, #f6ad55 20%, #fef5e7 100%);
-            border: 3px solid #ed8936;
-            border-radius: 20px;
-            padding: 35px;
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 20%, #fff5f5 100%);
+            border: 2px solid #feb2b2;
+            border-radius: 16px;
+            padding: 28px;
             margin: 40px 0;
+            position: relative;
         }
         
         .info-title {
-            color: #c05621;
+            color: #c53030;
             font-weight: 700;
-            margin-bottom: 16px;
-            font-size: 20px;
+            margin-bottom: 12px;
+            font-size: 18px;
             display: flex;
             align-items: center;
             gap: 12px;
         }
         
         .info-text {
-            color: #744210;
-            font-size: 16px;
+            color: #742a2a;
+            font-size: 15px;
             line-height: 1.7;
             margin: 0;
         }
         
-        .manual-link {
-            background: rgba(255, 255, 255, 0.9);
-            border: 2px solid #ed8936;
-            border-radius: 12px;
-            padding: 20px;
-            font-family: 'Courier New', Monaco, monospace;
-            font-size: 14px;
-            color: #c05621;
-            word-break: break-all;
-            line-height: 1.5;
-            margin-top: 16px;
+        .link-section {
+            background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 20%, #ebf8ff 100%);
+            border: 2px solid #90cdf4;
+            border-radius: 16px;
+            padding: 28px;
+            margin: 30px 0;
         }
         
-        .security-section {
-            background: linear-gradient(135d, #e6fffa 0%, #81e6d9 20%, #e6fffa 100%);
-            border: 3px solid #38b2ac;
-            border-radius: 20px;
-            padding: 35px;
-            margin: 40px 0;
-        }
-        
-        .security-title {
-            color: #2c7a7b;
+        .link-title {
+            color: #2c5282;
             font-weight: 700;
             margin-bottom: 16px;
-            font-size: 20px;
+            font-size: 18px;
             display: flex;
             align-items: center;
             gap: 12px;
         }
         
-        .security-text {
-            color: #2c7a7b;
-            font-size: 16px;
-            line-height: 1.7;
-            margin: 0;
+        .manual-link {
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid #90cdf4;
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            color: #2c5282;
+            word-break: break-all;
+            line-height: 1.5;
+            margin-top: 12px;
         }
         
         .email-footer {
             background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
             color: #e2e8f0;
-            padding: 60px 40px 50px;
+            padding: 50px 40px 40px;
             text-align: center;
+            position: relative;
         }
         
         .footer-logo {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 800;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             background: linear-gradient(135deg, #667eea, #764ba2);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -403,42 +450,30 @@
         }
         
         .footer-tagline {
-            font-size: 18px;
+            font-size: 16px;
             color: #a0aec0;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
             font-weight: 500;
         }
         
-        .footer-text {
-            font-size: 16px;
-            color: #718096;
-            line-height: 1.6;
-            margin: 12px 0;
-        }
-        
-        .footer-copyright {
-            font-size: 14px;
-            color: #4a5568;
-            margin-top: 30px;
-            padding-top: 30px;
-            border-top: 1px solid #4a5568;
-        }
-        
         .social-links {
-            margin: 30px 0;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 30px;
         }
         
         .social-link {
-            display: inline-block;
-            margin: 0 10px;
-            width: 50px;
-            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
             background: linear-gradient(135deg, #4a5568, #2d3748);
             color: #e2e8f0;
             text-decoration: none;
-            border-radius: 15px;
-            font-size: 20px;
-            line-height: 50px;
+            border-radius: 12px;
+            font-size: 18px;
             transition: all 0.3s ease;
             border: 2px solid rgba(255, 255, 255, 0.1);
         }
@@ -449,73 +484,72 @@
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
         
-        @media only screen and (max-width: 640px) {
-            .email-wrapper {
+        .footer-text {
+            font-size: 14px;
+            color: #718096;
+            line-height: 1.6;
+            margin: 8px 0;
+        }
+        
+        .footer-copyright {
+            font-size: 12px;
+            color: #4a5568;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #4a5568;
+        }
+        
+        @media (max-width: 768px) {
+            body {
                 padding: 10px;
             }
             
-            .email-container {
-                border-radius: 16px;
+            .email-wrapper {
                 margin: 10px;
+                border-radius: 16px;
             }
             
             .email-header,
             .email-content,
             .email-footer {
-                padding: 40px 20px;
+                padding: 30px 24px;
             }
             
             .header-title {
-                font-size: 36px;
+                font-size: 32px;
             }
             
             .welcome-title {
-                font-size: 28px;
-            }
-            
-            .welcome-emoji {
-                font-size: 60px;
+                font-size: 24px;
             }
             
             .verify-button {
-                padding: 18px 40px;
-                font-size: 18px;
+                padding: 16px 32px;
+                font-size: 16px;
                 width: 100%;
-                max-width: 320px;
+                max-width: 300px;
             }
             
             .features-grid {
-                display: block;
-            }
-            
-            .features-row {
-                display: block;
-            }
-            
-            .feature-card {
-                display: block;
-                width: 100%;
-                margin-bottom: 20px;
-                padding: 0;
+                grid-template-columns: 1fr;
+                gap: 20px;
             }
             
             .user-email-badge {
                 display: block;
-                margin: 20px 0;
+                margin: 16px 0;
             }
             
-            .cta-section,
-            .info-section,
-            .security-section {
-                padding: 30px 20px;
+            .social-links {
+                flex-wrap: wrap;
             }
         }
         
-        @media only screen and (max-width: 480px) {
+        @media (max-width: 480px) {
             .email-header,
             .email-content,
             .email-footer {
-                padding: 30px 15px;
+                padding: 24px 20px;
             }
             
             .header-title {
@@ -526,149 +560,133 @@
                 font-size: 48px;
             }
             
-            .welcome-title {
-                font-size: 24px;
-            }
-            
-            .welcome-message {
-                font-size: 18px;
-            }
-            
-            .cta-title {
-                font-size: 24px;
-            }
-            
-            .features-title {
-                font-size: 28px;
+            .cta-section,
+            .info-section,
+            .link-section {
+                padding: 24px 20px;
             }
         }
         
-        @media only screen and (min-width: 641px) and (max-width: 900px) {
-            .features-grid {
-                display: block;
+        @media print {
+            body {
+                background: white !important;
             }
             
-            .features-row {
-                display: block;
+            .email-wrapper {
+                box-shadow: none !important;
+                border: 1px solid #e2e8f0 !important;
             }
             
-            .feature-card {
-                display: inline-block;
-                width: 48%;
-                margin: 1%;
-                vertical-align: top;
+            .verify-button {
+                background: #48bb78 !important;
+                color: white !important;
             }
         }
     </style>
 </head>
 <body>
     <div class="email-wrapper">
-        <div class="email-container">
-            <div class="email-header">
-                <div class="logo-container">
-                    <div class="logo">📊</div>
-                </div>
-                <h1 class="header-title">Hoş Geldiniz!</h1>
-                <p class="header-subtitle">Tabledit ailesine katıldığınız için teşekkürler</p>
+        <div class="email-header">
+            <div class="floating-shapes">
+                <div class="shape"></div>
+                <div class="shape"></div>
+                <div class="shape"></div>
             </div>
             
-            <div class="email-content">
-                <div class="welcome-section">
-                    <span class="welcome-emoji">🎉</span>
-                    <h2 class="welcome-title">Merhaba {{USER_NAME}}!</h2>
-                    <div class="welcome-message">
-                        <span class="user-email-badge">{{USER_EMAIL}}</span> 
-                        adresli e-posta hesabınızla <strong>Tabledit</strong>'e başarıyla kaydoldunuz!
-                    </div>
-                </div>
-                
-                <div class="cta-section">
-                    <h3 class="cta-title">🚀 Hesabınızı Aktifleştirin</h3>
-                    <p class="cta-subtitle">
-                        Tabledit'in tüm özelliklerini kullanmaya başlamak için 
-                        e-posta adresinizi doğrulamanız gerekiyor.
-                    </p>
-                    <a href="{{VERIFICATION_URL}}" class="verify-button">
-                        ✅ E-postamı Doğrula
-                    </a>
-                </div>
-                
-                <div class="features-section">
-                    <h3 class="features-title">🌟 Tabledit ile Neler Yapabilirsiniz?</h3>
-                    <div class="features-grid">
-                        <div class="features-row">
-                            <div class="feature-card">
-                                <div class="feature-inner">
-                                    <span class="feature-icon">📊</span>
-                                    <h4 class="feature-title">Excel Uyumluluğu</h4>
-                                    <p class="feature-description">Excel dosyalarını kolayca yükleyin, düzenleyin ve dışa aktarın</p>
-                                </div>
-                            </div>
-                            <div class="feature-card">
-                                <div class="feature-inner">
-                                    <span class="feature-icon">🎨</span>
-                                    <h4 class="feature-title">Akıllı Renklendirme</h4>
-                                    <p class="feature-description">Hücreleri, satırları ve sütunları istediğiniz gibi renklendirin</p>
-                                </div>
-                            </div>
-                            <div class="feature-card">
-                                <div class="feature-inner">
-                                    <span class="feature-icon">☁️</span>
-                                    <h4 class="feature-title">Bulut Depolama</h4>
-                                    <p class="feature-description">Tablolarınız güvenle bulutta saklanır ve her yerden erişilebilir</p>
-                                </div>
-                            </div>
-                            <div class="feature-card">
-                                <div class="feature-inner">
-                                    <span class="feature-icon">🔄</span>
-                                    <h4 class="feature-title">Gerçek Zamanlı</h4>
-                                    <p class="feature-description">Değişiklikler anında kaydedilir, veri kaybı yaşamazsınız</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="info-section">
-                    <div class="info-title">
-                        <span>🔗</span>
-                        <span>Buton çalışmıyorsa</span>
-                    </div>
-                    <p class="info-text">Aşağıdaki linki kopyalayıp tarayıcınızın adres çubuğuna yapıştırın:</p>
-                    <div class="manual-link">{{VERIFICATION_URL}}</div>
-                </div>
-                
-                <div class="security-section">
-                    <div class="security-title">
-                        <span>🔒</span>
-                        <span>Güvenlik Bilgisi</span>
-                    </div>
-                    <p class="security-text">
-                        Bu doğrulama linki <strong>24 saat</strong> geçerlidir ve sadece <strong>bir kez</strong> kullanılabilir. 
-                        Hesabınızın güvenliği için bu e-postayı kimseyle paylaşmayın. 
-                        Eğer bu e-postayı siz talep etmediyseniz güvenle silebilirsiniz.
-                    </p>
+            <div class="logo-container">
+                <div class="logo">📊</div>
+            </div>
+            
+            <h1 class="header-title">Hoş Geldiniz!</h1>
+            <p class="header-subtitle">Tabledit ailesine katıldığınız için teşekkürler</p>
+        </div>
+        
+        <div class="email-content">
+            <div class="welcome-section">
+                <span class="welcome-emoji">🎉</span>
+                <h2 class="welcome-title">Merhaba {{USER_NAME}}!</h2>
+                <div class="welcome-message">
+                    <span class="user-email-badge">{{USER_EMAIL}}</span> 
+                    adresli e-posta hesabınızla <strong>Tabledit</strong>'e başarıyla kaydoldunuz!
                 </div>
             </div>
             
-            <div class="email-footer">
-                <div class="footer-logo">📊 Tabledit</div>
-                <p class="footer-tagline">Modern Tablo Düzenleme Sistemi</p>
-                
-                <div class="social-links">
-                    <a href="#" class="social-link" title="Destek">📧</a>
-                    <a href="#" class="social-link" title="Yardım">📖</a>
-                    <a href="#" class="social-link" title="Website">🌐</a>
-                    <a href="#" class="social-link" title="GitHub">💻</a>
+            <div class="cta-section">
+                <h3 class="cta-title">🚀 Hesabınızı Aktifleştirin</h3>
+                <p class="cta-subtitle">
+                    Tabledit'in tüm özelliklerini kullanmaya başlamak için 
+                    e-posta adresinizi doğrulamanız gerekiyor.
+                </p>
+                <a href="{{VERIFICATION_URL}}" class="verify-button">
+                    ✅ E-postamı Doğrula
+                </a>
+            </div>
+            
+            <div class="features-section">
+                <h3 class="features-title">🌟 Tabledit ile Neler Yapabilirsiniz?</h3>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">📊</span>
+                        <h4 class="feature-title">Excel Uyumluluğu</h4>
+                        <p class="feature-description">Excel dosyalarını kolayca yükleyin, düzenleyin ve dışa aktarın</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🎨</span>
+                        <h4 class="feature-title">Akıllı Renklendirme</h4>
+                        <p class="feature-description">Hücreleri, satırları ve sütunları istediğiniz gibi renklendirin</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">☁️</span>
+                        <h4 class="feature-title">Bulut Depolama</h4>
+                        <p class="feature-description">Tablolarınız güvenle bulutta saklanır ve her yerden erişilebilir</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🔄</span>
+                        <h4 class="feature-title">Gerçek Zamanlı</h4>
+                        <p class="feature-description">Değişiklikler anında kaydedilir, veri kaybı yaşamazsınız</p>
+                    </div>
                 </div>
-                
-                <p class="footer-text">Bu e-posta otomatik olarak gönderilmiştir, lütfen yanıtlamayın.</p>
-                <p class="footer-text">Herhangi bir sorunuz varsa destek ekibimizle iletişime geçin.</p>
-                
-                <div class="footer-copyright">
-                    Tabledit © {{CURRENT_YEAR}} - Tüm hakları saklıdır.<br>
-                    Bu e-postayı almak istemiyorsanız hesabınızı silebilirsiniz.
+            </div>
+            
+            <div class="link-section">
+                <div class="link-title">
+                    <span>🔗</span>
+                    <span>Buton çalışmıyorsa</span>
                 </div>
+                <p>Aşağıdaki linki kopyalayıp tarayıcınızın adres çubuğuna yapıştırın:</p>
+                <div class="manual-link">{{VERIFICATION_URL}}</div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-title">
+                    <span>🔒</span>
+                    <span>Güvenlik Bilgisi</span>
+                </div>
+                <p class="info-text">
+                    Bu doğrulama linki <strong>24 saat</strong> geçerlidir ve sadece <strong>bir kez</strong> kullanılabilir. 
+                    Hesabınızın güvenliği için bu e-postayı kimseyle paylaşmayın. 
+                    Eğer bu e-postayı siz talep etmediyseniz güvenle silebilirsiniz.
+                </p>
+            </div>
+        </div>
+        
+        <div class="email-footer">
+            <div class="footer-logo">📊 Tabledit</div>
+            <p class="footer-tagline">Modern Tablo Düzenleme Sistemi</p>
+            
+            <div class="social-links">
+                <a href="#" class="social-link" title="Destek">📧</a>
+                <a href="#" class="social-link" title="Yardım">📖</a>
+                <a href="#" class="social-link" title="Website">🌐</a>
+                <a href="#" class="social-link" title="GitHub">💻</a>
+            </div>
+            
+            <p class="footer-text">Bu e-posta otomatik olarak gönderilmiştir, lütfen yanıtlamayın.</p>
+            <p class="footer-text">Herhangi bir sorunuz varsa destek ekibimizle iletişime geçin.</p>
+            
+            <div class="footer-copyright">
+                Tabledit © {{CURRENT_YEAR}} - Tüm hakları saklıdır.<br>
+                Bu e-postayı almak istemiyorsanız hesabınızı silebilirsiniz.
             </div>
         </div>
     </div>

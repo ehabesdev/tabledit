@@ -128,3 +128,12 @@ console.log('  🗂️ Project ID:', firebaseConfig.projectId);
 console.log('  🔒 Güvenlik: Production modu aktif');
 
 export { auth, db, securityConfig };
+
+export function getBaseUrl() {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    if (origin.includes('github.io')) {
+        return `${origin}/tabledit`;
+    }
+    return origin;
+}

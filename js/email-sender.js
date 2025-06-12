@@ -1,4 +1,4 @@
-import { db } from './firebase-config.js';
+import { db, getBaseUrl } from './firebase-config.js';
 import { 
     doc, 
     setDoc, 
@@ -412,10 +412,7 @@ async function logEmailActivity(emailData, result) {
 export async function sendVerificationEmail(userId, email, name, token) {
     try {
         console.log('📧 Doğrulama e-postası hazırlanıyor:', email);
-        
-        const baseUrl = window.location.origin;
-        const verificationUrl = `${baseUrl}/verify.html?token=${token}`;
-        
+        const verificationUrl = `${getBaseUrl()}/verify.html?token=${token}`;
         const templateData = {
             userName: name,
             userEmail: email,
