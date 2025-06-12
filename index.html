@@ -533,7 +533,7 @@
         if (verifiedStatus === 'success') {
             setTimeout(() => {
                 alert('🎉 E-posta doğrulama başarılı! Hoş geldiniz!\n\nArtık Tabledit\'in tüm özelliklerini kullanabilirsiniz.');
-                const newUrl = window.location.href.split('?')[0];
+                const newUrl = window.location.href.split('/tabledit')[0];
                 window.history.replaceState({}, document.title, newUrl);
             }, 1000);
         }

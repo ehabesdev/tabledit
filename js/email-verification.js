@@ -1,4 +1,4 @@
-import { db, getBaseUrl } from './firebase-config.js';
+import { db } from './firebase-config.js';
 import { 
     doc, 
     setDoc, 
@@ -320,7 +320,8 @@ export async function sendVerificationEmail(userId, email, name) {
         console.log('📧 Doğrulama e-postası hazırlanıyor:', email);
         
         const token = await createVerificationToken(userId, email, name);
-        const verificationUrl = `${getBaseUrl()}/verify.html?token=${token}`;
+        const repoName = '/tabledit';
+        const verificationUrl = `${window.location.origin}${repoName}/verify.html?token=${token}`;
         const emailHTML = createVerificationEmailHTML(name, email, verificationUrl);
         
         const emailData = {
