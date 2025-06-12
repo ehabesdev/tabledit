@@ -12,11 +12,13 @@ import {
 
 console.log('📧 Email Verification modülü yüklendi');
 
+// DOM elementleri
 const loadingState = document.getElementById('loadingState');
 const successState = document.getElementById('successState');
 const errorState = document.getElementById('errorState');
 const noTokenState = document.getElementById('noTokenState');
 
+// URL'den token al
 const verificationToken = window.verificationToken;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -36,6 +38,8 @@ async function verifyEmailToken(token) {
     try {
         showLoadingState();
         console.log('🔍 Token Firestore\'da aranıyor...');
+        
+        // Token'ı Firestore'dan bul
         const tokenDoc = await getDoc(doc(db, 'emailVerificationTokens', token));
         
         if (!tokenDoc.exists()) {
@@ -43,7 +47,19 @@ async function verifyEmailToken(token) {
         }
         
         const tokenData = tokenDoc.data();
-        console.log('✅ Token bulundu:', tokenData);
+        console.log('✅ Token bulundu:', {
+            userId: tokenData.userId,
+            email: tokenData.email,
+            used: tokenData.used,
+            createdAt: tokenData.createdAt
+        });
+        
+        // Token kullanılmış mı kontrol et
+        if (tokenData.used) {
+            throw new Error('TOKEN_ALREADY_USED');
+        }
+        
+        // Token süresi dolmuş mu kontrol et
         const tokenAge = Date.now() - tokenData.createdAt.toMillis();
         const maxAge = 24 * 60 * 60 * 1000; // 24 saat
         
@@ -51,8 +67,17 @@ async function verifyEmailToken(token) {
             throw new Error('TOKEN_EXPIRED');
         }
         
-        console.log('👤 Kullanıcı güncelleniyor:', tokenData.userId);
+        console.log('👤 Kullanıcı doğrulama işlemi başlatılıyor:', tokenData.userId);
+        
+        // Kullanıcı verilerini Firestore'da güncelle
         const userRef = doc(db, 'users', tokenData.userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (!userDoc.exists()) {
+            throw new Error('USER_NOT_FOUND');
+        }
+        
+        // Kullanıcının e-posta doğrulamasını tamamla
         await updateDoc(userRef, {
             emailVerified: true,
             verifiedAt: new Date(),
@@ -60,10 +85,24 @@ async function verifyEmailToken(token) {
         });
         
         console.log('✅ Kullanıcı emailVerified = true olarak güncellendi');
+        
+        // Token'ı kullanıldı olarak işaretle ve sil (güvenlik için)
+        await updateDoc(doc(db, 'emailVerificationTokens', token), {
+            used: true,
+            usedAt: new Date()
+        });
+        
+        // Token'ı sil (tek kullanım)
         await deleteDoc(doc(db, 'emailVerificationTokens', token));
-        console.log('🗑️ Token silindi (tek kullanım)');
+        console.log('🗑️ Token silindi (tek kullanım güvenliği)');
+        
+        // Başarı durumunu göster
         showSuccessState(tokenData.email);
-        logVerificationEvent('success', tokenData.userId);
+        
+        // Analytics/logging
+        logVerificationEvent('success', tokenData.userId, tokenData.email);
+        
+        console.log('🎉 E-posta doğrulama işlemi başarıyla tamamlandı!');
         
     } catch (error) {
         console.error('❌ Doğrulama hatası:', error);
@@ -73,10 +112,16 @@ async function verifyEmailToken(token) {
         
         switch (error.message) {
             case 'TOKEN_NOT_FOUND':
-                errorMessage = 'Doğrulama token\'ı bulunamadı. Link geçersiz olabilir.';
+                errorMessage = 'Doğrulama token\'ı bulunamadı veya geçersiz. Link doğru mu kontrol edin.';
+                break;
+            case 'TOKEN_ALREADY_USED':
+                errorMessage = 'Bu doğrulama linki daha önce kullanılmış. E-posta adresiniz zaten doğrulanmış olabilir.';
                 break;
             case 'TOKEN_EXPIRED':
-                errorMessage = 'Doğrulama linkinin süresi dolmuş. Lütfen yeni bir doğrulama e-postası isteyin.';
+                errorMessage = 'Doğrulama linkinin süresi dolmuş (24 saat). Lütfen yeni bir doğrulama e-postası isteyin.';
+                break;
+            case 'USER_NOT_FOUND':
+                errorMessage = 'Kullanıcı kayıtları bulunamadı. Lütfen tekrar kayıt olun.';
                 break;
             case 'PERMISSION_DENIED':
                 errorMessage = 'Bu işlem için yetkiniz yok.';
@@ -85,86 +130,100 @@ async function verifyEmailToken(token) {
                 if (error.code) {
                     errorCode = error.code;
                     errorMessage = `Teknik hata: ${error.code}`;
+                } else {
+                    errorMessage = error.message || errorMessage;
                 }
         }
         
         showErrorState(errorMessage, errorCode);
-        logVerificationEvent('error', null, errorCode);
+        logVerificationEvent('error', null, null, errorCode);
     }
 }
 
 function showLoadingState() {
-    loadingState.style.display = 'block';
-    successState.style.display = 'none';
-    errorState.style.display = 'none';
-    noTokenState.style.display = 'none';
+    if (loadingState) loadingState.style.display = 'block';
+    if (successState) successState.style.display = 'none';
+    if (errorState) errorState.style.display = 'none';
+    if (noTokenState) noTokenState.style.display = 'none';
+    
+    console.log('⏳ Loading durumu gösterildi');
 }
 
-
 function showSuccessState(email) {
-    loadingState.style.display = 'none';
-    successState.style.display = 'block';
-    errorState.style.display = 'none';
-    noTokenState.style.display = 'none';
+    if (loadingState) loadingState.style.display = 'none';
+    if (successState) successState.style.display = 'block';
+    if (errorState) errorState.style.display = 'none';
+    if (noTokenState) noTokenState.style.display = 'none';
     
+    // E-posta adresini göster
     const emailElement = document.getElementById('verifiedEmail');
-    if (emailElement) {
+    if (emailElement && email) {
         emailElement.textContent = email;
     }
     
-    console.log('🎉 Başarı sayfası gösterildi');
+    console.log('🎉 Başarı sayfası gösterildi:', email);
+    
+    // 5 saniye sonra ana sayfaya yönlendir
+    setTimeout(() => {
+        console.log('🏠 Ana sayfaya yönlendiriliyor...');
+        window.location.href = '/';
+    }, 5000);
 }
 
 function showErrorState(message, errorCode = '') {
-    loadingState.style.display = 'none';
-    successState.style.display = 'none';
-    errorState.style.display = 'block';
-    noTokenState.style.display = 'none';
+    if (loadingState) loadingState.style.display = 'none';
+    if (successState) successState.style.display = 'none';
+    if (errorState) errorState.style.display = 'block';
+    if (noTokenState) noTokenState.style.display = 'none';
     
     const errorDetails = document.getElementById('errorDetails');
     if (errorDetails) {
         errorDetails.innerHTML = `
             <strong>❌ ${message}</strong><br>
-            ${errorCode ? `<small>Hata kodu: ${errorCode}</small>` : ''}
+            ${errorCode ? `<small style="opacity: 0.8; margin-top: 10px; display: block;">Hata kodu: ${errorCode}</small>` : ''}
         `;
     }
     
     console.log('💥 Hata sayfası gösterildi:', message);
 }
 
-
 function showNoTokenState() {
-    loadingState.style.display = 'none';
-    successState.style.display = 'none';
-    errorState.style.display = 'none';
-    noTokenState.style.display = 'block';
+    if (loadingState) loadingState.style.display = 'none';
+    if (successState) successState.style.display = 'none';
+    if (errorState) errorState.style.display = 'none';
+    if (noTokenState) noTokenState.style.display = 'block';
     
     console.log('🔍 Token yok sayfası gösterildi');
 }
 
-
-function logVerificationEvent(type, userId = null, errorCode = null) {
+function logVerificationEvent(type, userId = null, email = null, errorCode = null) {
     try {
         const eventData = {
             type: `email_verification_${type}`,
             timestamp: new Date(),
             userId: userId,
+            email: email,
             errorCode: errorCode,
             userAgent: navigator.userAgent,
-            url: window.location.href
+            url: window.location.href,
+            referrer: document.referrer
         };
         
-        console.log('📊 Verification event:', eventData);
+        console.log('📊 Verification event logged:', eventData);
         
+        // Bu veriler ileride analytics için Firestore'a kaydedilebilir
+        // await addDoc(collection(db, 'verificationEvents'), eventData);
         
     } catch (error) {
         console.warn('⚠️ Analytics logging hatası:', error);
     }
 }
 
-
+// Public API fonksiyonları
 export async function checkUserVerificationStatus(userId) {
     try {
+        console.log('🔍 Kullanıcı doğrulama durumu kontrol ediliyor:', userId);
+        
         const userDoc = await getDoc(doc(db, 'users', userId));
         
         if (!userDoc.exists()) {
@@ -172,19 +231,22 @@ export async function checkUserVerificationStatus(userId) {
         }
         
         const userData = userDoc.data();
-        return {
+        const result = {
             verified: userData.emailVerified || false,
             exists: true,
             verifiedAt: userData.verifiedAt || null,
-            email: userData.email
+            email: userData.email,
+            name: userData.name
         };
+        
+        console.log('✅ Kullanıcı doğrulama durumu:', result);
+        return result;
         
     } catch (error) {
         console.error('❌ Kullanıcı doğrulama durumu kontrol hatası:', error);
         return { verified: false, exists: false, error: error.message };
     }
 }
-
 
 export async function cleanupExpiredTokens() {
     try {
@@ -200,14 +262,16 @@ export async function cleanupExpiredTokens() {
         const expiredTokens = await getDocs(tokensQuery);
         
         if (expiredTokens.empty) {
-            console.log('✅ Temizlenecek token bulunamadı');
+            console.log('✅ Temizlenecek süresi dolmuş token bulunamadı');
             return 0;
         }
+        
+        console.log(`🗑️ ${expiredTokens.size} adet süresi dolmuş token bulundu, siliniyor...`);
         
         const deletePromises = expiredTokens.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
         
-        console.log(`🗑️ ${expiredTokens.size} adet süresi dolmuş token temizlendi`);
+        console.log(`✅ ${expiredTokens.size} adet süresi dolmuş token temizlendi`);
         return expiredTokens.size;
         
     } catch (error) {
@@ -216,8 +280,120 @@ export async function cleanupExpiredTokens() {
     }
 }
 
+export async function getVerificationTokenInfo(token) {
+    try {
+        console.log('🔍 Token bilgisi alınıyor:', token.substring(0, 10) + '...');
+        
+        const tokenDoc = await getDoc(doc(db, 'emailVerificationTokens', token));
+        
+        if (!tokenDoc.exists()) {
+            return { exists: false };
+        }
+        
+        const tokenData = tokenDoc.data();
+        const tokenAge = Date.now() - tokenData.createdAt.toMillis();
+        const maxAge = 24 * 60 * 60 * 1000; // 24 saat
+        
+        return {
+            exists: true,
+            used: tokenData.used || false,
+            expired: tokenAge > maxAge,
+            email: tokenData.email,
+            name: tokenData.name,
+            createdAt: tokenData.createdAt,
+            ageHours: Math.floor(tokenAge / (60 * 60 * 1000))
+        };
+        
+    } catch (error) {
+        console.error('❌ Token bilgisi alma hatası:', error);
+        return { exists: false, error: error.message };
+    }
+}
+
+export async function resendVerificationEmail(userId) {
+    try {
+        console.log('📧 Doğrulama e-postası yeniden gönderiliyor:', userId);
+        
+        // Kullanıcı bilgilerini al
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        
+        if (!userDoc.exists()) {
+            throw new Error('Kullanıcı bulunamadı');
+        }
+        
+        const userData = userDoc.data();
+        
+        if (userData.emailVerified) {
+            throw new Error('E-posta zaten doğrulanmış');
+        }
+        
+        // Email sender modülünü dinamik olarak yükle
+        const { sendCustomVerificationEmail } = await import('./email-sender.js');
+        
+        const result = await sendCustomVerificationEmail(
+            userId,
+            userData.email,
+            userData.name
+        );
+        
+        console.log('✅ Doğrulama e-postası yeniden gönderildi');
+        return result;
+        
+    } catch (error) {
+        console.error('❌ E-posta yeniden gönderme hatası:', error);
+        throw error;
+    }
+}
+
+// Global erişim için window'a ekle
 window.emailVerification = {
     checkUserVerificationStatus,
     cleanupExpiredTokens,
-    verifyEmailToken
+    verifyEmailToken,
+    getVerificationTokenInfo,
+    resendVerificationEmail
+};
+
+// Debug fonksiyonları
+window.debugVerificationSystem = function() {
+    console.log('🧪 E-posta doğrulama sistemi debug bilgileri:');
+    console.log('📧 Email Verification modülü:', {
+        checkUserVerificationStatus,
+        cleanupExpiredTokens,
+        verifyEmailToken,
+        getVerificationTokenInfo,
+        resendVerificationEmail
+    });
+    
+    console.log('🔑 Mevcut token:', verificationToken);
+    
+    if (verificationToken) {
+        getVerificationTokenInfo(verificationToken).then(info => {
+            console.log('📊 Token bilgisi:', info);
+        });
+    }
+    
+    return {
+        currentToken: verificationToken,
+        ready: true
+    };
+};
+
+// Token kontrol fonksiyonu
+window.testTokenValidation = async function(testToken) {
+    if (!testToken) {
+        testToken = verificationToken || prompt('Test edilecek token\'ı girin:');
+    }
+    
+    if (!testToken) {
+        console.log('❌ Token girilmedi');
+        return;
+    }
+    
+    console.log('🧪 Token test ediliyor:', testToken.substring(0, 10) + '...');
+    
+    const info = await getVerificationTokenInfo(testToken);
+    console.log('📊 Token test sonucu:', info);
+    
+    return info;
 };
