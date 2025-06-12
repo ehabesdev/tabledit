@@ -160,8 +160,8 @@
                     <div class="verification-icon">📧</div>
                     <div class="verification-text">
                         <h4>E-posta Doğrulama Gerekli</h4>
-                        <p>Hesabınızı kullanabilmek için e-posta adresinizi doğrulamanız gerekiyor.</p>
-                        <p>Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.</p>
+                        <p>Hesabınızı tam olarak kullanabilmek için e-posta adresinizi doğrulamanız gerekiyor.</p>
+                        <p>Size özel tasarım doğrulama e-postası gönderdik. Lütfen e-posta kutunuzu kontrol edin.</p>
                     </div>
                     <div class="verification-actions">
                         <button class="btn btn-primary" onclick="checkEmailVerificationStatus()">
@@ -343,22 +343,22 @@
             <div class="auth-modal-body">
                 <div class="email-verification-info">
                     <div class="verification-icon-large">📧</div>
-                    <h4>Doğrulama E-postası Gönderildi</h4>
+                    <h4>Özel Tasarım Doğrulama E-postası</h4>
                     <p>
                         <strong class="verification-email">example@email.com</strong> adresine 
-                        bir doğrulama e-postası gönderdik.
+                        özel tasarım doğrulama e-postası gönderdik.
                     </p>
                     <p>
-                        Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.
-                        E-posta spam klasörünüzde de olabilir.
+                        E-postamız modern tasarım ve kullanışlı arayüz ile hazırlanmıştır.
+                        Lütfen e-posta kutunuzu kontrol edin.
                     </p>
                     
                     <div class="verification-steps">
                         <h5>📋 Yapmanız Gerekenler:</h5>
                         <ol>
                             <li>E-posta kutunuzu açın</li>
-                            <li>"Tabledit - E-posta Doğrulama" konulu e-postayı bulun</li>
-                            <li>E-postadaki "E-postamı Doğrula" butonuna tıklayın</li>
+                            <li>"🎉 Tabledit - E-posta Adresinizi Doğrulayın" konulu e-postayı bulun</li>
+                            <li>E-postadaki "✅ E-postamı Doğrula" butonuna tıklayın</li>
                             <li>Bu sayfaya geri gelip "Doğrulamayı Kontrol Et" butonuna basın</li>
                         </ol>
                     </div>
@@ -493,6 +493,7 @@
     </div>
 
     <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/email-verification.js"></script>
     <script type="module" src="js/auth.js"></script>
     <script type="module" src="js/user-manager.js"></script>
     <script src="js/index.js"></script>
@@ -502,7 +503,7 @@
             import('./js/auth.js').then(module => {
                 module.checkEmailVerification();
             }).catch(error => {
-                console.error('Auth modülü yüklenemedi:', error);
+                console.error('Auth module error:', error);
                 alert('Kontrol edilirken hata oluştu. Sayfayı yenileyin.');
             });
         }
@@ -511,7 +512,7 @@
             import('./js/auth.js').then(module => {
                 module.resendEmailVerification();
             }).catch(error => {
-                console.error('Auth modülü yüklenemedi:', error);
+                console.error('Auth module error:', error);
                 alert('E-posta gönderilirken hata oluştu. Sayfayı yenileyin.');
             });
         }
@@ -520,168 +521,19 @@
             import('./js/auth.js').then(module => {
                 module.closeEmailVerificationModal();
             }).catch(error => {
-                console.error('Auth modülü yüklenemedi:', error);
+                console.error('Auth module error:', error);
             });
         }
-    </script>
 
-<script>
-        window.closeVerificationHandler = function() {
-            console.log('🔒 Verification handler kapatılıyor');
-            document.getElementById('emailVerificationHandler').style.display = 'none';
-            
-            const url = new URL(window.location);
-            url.searchParams.delete('mode');
-            url.searchParams.delete('oobCode');
-            url.searchParams.delete('apiKey');
-            url.searchParams.delete('continueUrl');
-            url.searchParams.delete('lang');
-            window.history.replaceState({}, document.title, url.toString());
-            
+        const urlParams = new URLSearchParams(window.location.search);
+        const verifiedStatus = urlParams.get('verified');
+        
+        if (verifiedStatus === 'success') {
             setTimeout(() => {
-                console.log('🔄 Sayfa yenileniyor...');
-                location.reload();
-            }, 500);
-        }
-
-        window.resendVerificationFromHandler = function() {
-            console.log('📧 Yeniden gönderme başlatılıyor');
-            closeVerificationHandler();
-            
-            setTimeout(() => {
-                if (window.resendVerificationEmail) {
-                    window.resendVerificationEmail();
-                } else {
-                    alert('Yeniden gönderme fonksiyonu bulunamadı. Lütfen giriş yapıp tekrar deneyin.');
-                }
+                alert('🎉 E-posta doğrulama başarılı! Hoş geldiniz!\n\nArtık Tabledit\'in tüm özelliklerini kullanabilirsiniz.');
+                const newUrl = window.location.href.split('?')[0];
+                window.history.replaceState({}, document.title, newUrl);
             }, 1000);
-        }
-        function checkURLForVerification() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const mode = urlParams.get('mode');
-            const actionCode = urlParams.get('oobCode');
-
-            console.log('🔍 URL Parametreleri KONTROL EDİLİYOR:');
-            console.log('  - mode:', mode);
-            console.log('  - oobCode:', actionCode ? 'Mevcut (' + actionCode.substring(0, 10) + '...)' : 'Yok');
-            console.log('  - Full URL:', window.location.href);
-
-            if (mode === 'verifyEmail' && actionCode) {
-                console.log('✅ E-posta doğrulama URL parametreleri BULUNDU!');
-                handleEmailVerificationFromURL(mode, actionCode);
-                return true;
-            } else {
-                console.log('❌ E-posta doğrulama parametreleri bulunamadı');
-                return false;
-            }
-        }
-
-        async function handleEmailVerificationFromURL(mode, actionCode) {
-            console.log('📧 E-posta doğrulama işlemi BAŞLATILIYOR...');
-            
-            const handler = document.getElementById('emailVerificationHandler');
-            if (!handler) {
-                console.error('❌ emailVerificationHandler elementi bulunamadı!');
-                return;
-            }
-            
-            handler.style.display = 'block';
-            
-            document.getElementById('verificationLoading').style.display = 'block';
-            document.getElementById('verificationSuccess').style.display = 'none';
-            document.getElementById('verificationError').style.display = 'none';
-            
-            try {
-                console.log('🔥 Firebase modülleri import ediliyor...');
-                
-                const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-                const { getAuth, applyActionCode } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-
-                console.log('✅ Firebase modülleri import edildi');
-
-                const firebaseConfig = {
-                    apiKey: "AIzaSyC2hj4HDIvzbPXyCkeIhCMBdMsfg7BpK7Q",
-                    authDomain: "tabledit.firebaseapp.com",
-                    projectId: "tabledit",
-                    storageBucket: "tabledit.firebasestorage.app",
-                    messagingSenderId: "95580006809",
-                    appId: "1:95580006809:web:ed118d543ba694c2178b08"
-                };
-
-                const app = initializeApp(firebaseConfig, 'verification-app');
-                const auth = getAuth(app);
-                
-                console.log('🔥 Verification Firebase başlatıldı');
-                console.log('🔑 Action code uygulanıyor:', actionCode.substring(0, 10) + '...');
-                
-                await applyActionCode(auth, actionCode);
-                
-                console.log('✅ E-POSTA DOĞRULAMA BAŞARILI!');
-                
-                document.getElementById('verificationLoading').style.display = 'none';
-                document.getElementById('verificationSuccess').style.display = 'block';
-                
-                setTimeout(() => {
-                    console.log('✅ 3 saniye sonra otomatik kapanıyor...');
-                    closeVerificationHandler();
-                }, 3000);
-                
-            } catch (error) {
-                console.error('❌ E-POSTA DOĞRULAMA HATASI:', error);
-                console.error('Error details:', {
-                    code: error.code,
-                    message: error.message,
-                    stack: error.stack
-                });
-                
-                let errorMessage = 'E-posta doğrulama sırasında bir hata oluştu.';
-                
-                switch (error.code) {
-                    case 'auth/expired-action-code':
-                        errorMessage = 'Doğrulama linki süresi dolmuş. Lütfen yeni bir doğrulama e-postası isteyin.';
-                        break;
-                    case 'auth/invalid-action-code':
-                        errorMessage = 'Geçersiz doğrulama linki. Lütfen yeni bir doğrulama e-postası isteyin.';
-                        break;
-                    case 'auth/user-disabled':
-                        errorMessage = 'Bu hesap devre dışı bırakılmış.';
-                        break;
-                    case 'auth/user-not-found':
-                        errorMessage = 'Kullanıcı bulunamadı.';
-                        break;
-                    default:
-                        errorMessage = error.message || errorMessage;
-                        if (error.code) {
-                            errorMessage += ` (Hata kodu: ${error.code})`;
-                        }
-                }
-                
-                document.getElementById('verificationLoading').style.display = 'none';
-                document.getElementById('verificationError').style.display = 'block';
-                document.getElementById('verificationErrorMessage').textContent = errorMessage;
-            }
-        }
-
-        console.log('🚀 SCRIPT YÜKLENDI - URL KONTROL EDİLİYOR...');
-        setTimeout(() => {
-            checkURLForVerification();
-        }, 500);
-
-        window.addEventListener('load', function() {
-            console.log('📄 WINDOW LOAD - TEKRAR KONTROL EDİLİYOR...');
-            setTimeout(() => {
-                checkURLForVerification();
-            }, 200);
-        });
-
-        window.addEventListener('hashchange', function() {
-            console.log('🔄 HASH DEĞİŞTİ - KONTROL EDİLİYOR...');
-            checkURLForVerification();
-        });
-
-        window.testEmailVerification = function() {
-            console.log('🧪 MANUAL TEST BAŞLATILIYOR...');
-            checkURLForVerification();
         }
     </script>
 </body>

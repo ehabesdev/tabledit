@@ -1157,7 +1157,7 @@ window.openAuthModal = function (type) {
     import('./auth.js').then(module => {
         module.openAuthModal(type);
     }).catch(error => {
-        console.error('Auth modülü yüklenemedi:', error);
+        console.error('Auth module load error:', error);
         alert('Giriş sistemi yüklenirken hata oluştu. Sayfayı yenileyin.');
     });
 }
@@ -1166,7 +1166,7 @@ window.closeAuthModal = function (type) {
     import('./auth.js').then(module => {
         module.closeAuthModal(type);
     }).catch(error => {
-        console.error('Auth modülü yüklenemedi:', error);
+        console.error('Auth module load error:', error);
     });
 }
 
@@ -1174,7 +1174,7 @@ window.toggleUserDropdown = function () {
     import('./auth.js').then(module => {
         module.toggleUserDropdown();
     }).catch(error => {
-        console.error('Auth modülü yüklenemedi:', error);
+        console.error('Auth module load error:', error);
     });
 }
 
@@ -1182,7 +1182,7 @@ window.logoutUser = function () {
     import('./auth.js').then(module => {
         module.logoutUser();
     }).catch(error => {
-        console.error('Auth modülü yüklenemedi:', error);
+        console.error('Auth module load error:', error);
         alert('Çıkış sistemi yüklenirken hata oluştu. Sayfayı yenileyin.');
     });
 }
@@ -1201,32 +1201,18 @@ window.createNewFile = function () {
 
 window.resendVerificationEmail = function() {
     import('./auth.js').then(module => {
-        module.resendCustomVerificationEmail();
+        module.resendEmailVerification();
     }).catch(error => {
-        console.error('Auth modülü yüklenemedi:', error);
+        console.error('Auth module load error:', error);
         alert('E-posta gönderilirken hata oluştu. Sayfayı yenileyin.');
     });
 }
 
 window.checkEmailVerificationStatus = function() {
-    import('./email-verification.js').then(module => {
-        import('./auth.js').then(authModule => {
-            const currentUser = authModule.getCurrentUser();
-            if (currentUser) {
-                module.checkUserVerificationStatus(currentUser.uid).then(status => {
-                    if (status.verified) {
-                        alert('🎉 E-posta başarıyla doğrulandı! Sayfa yenileniyor...');
-                        location.reload();
-                    } else {
-                        alert('⚠️ E-posta henüz doğrulanmamış. Lütfen e-posta kutunuzu kontrol edin.');
-                    }
-                });
-            } else {
-                alert('❌ Kullanıcı oturumu bulunamadı.');
-            }
-        });
+    import('./auth.js').then(module => {
+        module.checkEmailVerification();
     }).catch(error => {
-        console.error('E-posta doğrulama modülü yüklenemedi:', error);
+        console.error('Auth module load error:', error);
         alert('Kontrol edilirken hata oluştu. Sayfayı yenileyin.');
     });
 }
@@ -1235,52 +1221,11 @@ window.closeEmailVerificationModal = function() {
     import('./auth.js').then(module => {
         module.closeEmailVerificationModal();
     }).catch(error => {
-        console.error('Auth modülü yüklenemedi:', error);
-    });
-}
-
-window.testCustomEmailSystem = function() {
-    console.log('🧪 Özel e-posta sistemi test ediliyor...');
-    
-    import('./email-sender.js').then(emailModule => {
-        import('./email-verification.js').then(verifyModule => {
-            console.log('✅ E-posta modülleri yüklendi');
-            console.log('📧 E-posta gönderici:', emailModule);
-            console.log('🔍 E-posta doğrulayıcı:', verifyModule);
-            
-            const testToken = 'test_' + Date.now();
-            console.log('🔑 Test token:', testToken);
-            
-            alert('✅ Özel e-posta sistemi modülleri başarıyla yüklendi! Console\'u kontrol edin.');
-        });
-    }).catch(error => {
-        console.error('❌ E-posta modülleri yüklenemedi:', error);
-        alert('❌ Test başarısız: ' + error.message);
-    });
-}
-
-window.cleanupExpiredTokens = function() {
-    if (!confirm('Süresi dolmuş doğrulama token\'larını temizlemek istediğinizden emin misiniz?')) {
-        return;
-    }
-    
-    import('./email-verification.js').then(module => {
-        module.cleanupExpiredTokens().then(count => {
-            if (count >= 0) {
-                alert(`✅ ${count} adet süresi dolmuş token temizlendi.`);
-            } else {
-                alert('❌ Token temizleme sırasında hata oluştu.');
-            }
-        });
-    }).catch(error => {
-        console.error('E-posta doğrulama modülü yüklenemedi:', error);
-        alert('Temizlik işlemi başarısız: ' + error.message);
+        console.error('Auth module load error:', error);
     });
 }
 
 function setupFormEventListeners() {
-    console.log('📋 Form event listener\'ları ekleniyor...');
-    
     const turkeyData = {
         'İstanbul': ['Kadıköy', 'Beşiktaş', 'Şişli', 'Bakırköy', 'Üsküdar', 'Fatih', 'Beyoğlu', 'Kartal', 'Maltepe'],
         'Ankara': ['Çankaya', 'Keçiören', 'Mamak', 'Etimesgut', 'Sincan', 'Altındağ', 'Yenimahalle'],
@@ -1308,7 +1253,6 @@ function setupFormEventListeners() {
                     });
                 }
             });
-            console.log('✅ İl/İlçe dropdown listener\'ları eklendi');
         }
     }
     
@@ -1316,7 +1260,6 @@ function setupFormEventListeners() {
     if (registerForm) {
         registerForm.addEventListener('submit', function(event) {
             event.preventDefault();
-            console.log('📝 KAYIT FORMU GÖNDERİLDİ!');
             
             const formData = {
                 name: document.getElementById('registerName').value.trim(),
@@ -1326,66 +1269,45 @@ function setupFormEventListeners() {
                 password: document.getElementById('registerPassword').value
             };
             
-            console.log('📋 Form verileri:', { ...formData, password: '***' });
-            
             if (!formData.name || !formData.email || !formData.password) {
-                console.error('❌ Zorunlu alanlar eksik');
                 alert('Lütfen tüm zorunlu alanları doldurun.');
                 return;
             }
             
             if (!formData.city || !formData.district) {
-                console.warn('⚠️ İl/İlçe eksik, varsayılan değerler atanacak');
                 formData.city = formData.city || 'İstanbul';
                 formData.district = formData.district || 'Kadıköy';
             }
             
-            console.log('🎯 Auth modülü import ediliyor...');
-            
             import('./auth.js').then(module => {
-                console.log('✅ Auth modülü başarıyla yüklendi');
-                console.log('🚀 registerUser fonksiyonu çağrılıyor...');
                 module.registerUser(formData);
             }).catch(error => {
-                console.error('❌ Auth modülü import hatası:', error);
+                console.error('Auth module import error:', error);
                 alert('Sistem hatası: Auth modülü yüklenemedi - ' + error.message);
             });
         });
-        
-        console.log('✅ Kayıt ol form listener eklendi');
-    } else {
-        console.error('❌ Kayıt ol formu bulunamadı!');
     }
     
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', function(event) {
             event.preventDefault();
-            console.log('🔑 GİRİŞ FORMU GÖNDERİLDİ!');
             
             const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
             
-            console.log('📧 Giriş email:', email);
-            
             if (!email || !password) {
-                console.error('❌ Email veya şifre eksik');
                 alert('Lütfen e-posta ve şifrenizi girin.');
                 return;
             }
             
             import('./auth.js').then(module => {
-                console.log('✅ Auth modülü yüklendi, giriş başlatılıyor...');
                 module.loginUser(email, password);
             }).catch(error => {
-                console.error('❌ Auth modülü yüklenemedi:', error);
+                console.error('Auth module import error:', error);
                 alert('Sistem hatası: Auth modülü yüklenemedi');
             });
         });
-        
-        console.log('✅ Giriş yap form listener eklendi');
-    } else {
-        console.error('❌ Giriş yap formu bulunamadı!');
     }
     
     setupCityDistrictDropdowns();
@@ -1393,8 +1315,6 @@ function setupFormEventListeners() {
 
 const originalOnload = window.onload;
 window.onload = function () {
-    console.log('🚀 Sayfa yüklendi, sistemler başlatılıyor...');
-
     if (originalOnload) {
         originalOnload();
     }
@@ -1403,15 +1323,10 @@ window.onload = function () {
     updateColumnClickEvents();
     updateRowNumbers();
 
-    console.log('📊 Tablo sistemleri başlatıldı');
-    console.log('🔥 Firebase Auth başlatılıyor...');
-
     import('./auth.js').then(module => {
-        console.log('✅ Auth modülü yüklendi');
         module.initializeAuth();
     }).catch(error => {
-        console.error('❌ Auth modülü yüklenemedi:', error);
-        console.log('⚠️ Uygulama auth olmadan çalışmaya devam ediyor');
+        console.error('Auth module import error:', error);
 
         const authButtons = document.querySelector('.auth-buttons');
         if (authButtons) {
@@ -1420,6 +1335,4 @@ window.onload = function () {
     });
 
     setupFormEventListeners();
-    
-    console.log('✅ Tüm sistemler başarıyla başlatıldı');
 }

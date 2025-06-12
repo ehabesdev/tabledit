@@ -1,8 +1,5 @@
 import { auth, db, securityConfig } from './firebase-config.js';
-
-console.log('🔗 Auth modülü Firebase config\'i import etti');
-
-import { sendCustomVerificationEmail } from './email-sender.js';
+import { sendVerificationEmail, resendVerificationEmail, checkUserVerificationStatus } from './email-verification.js';
 
 import { 
     createUserWithEmailAndPassword, 
@@ -10,7 +7,6 @@ import {
     signOut,
     onAuthStateChanged,
     updateProfile,
-    sendEmailVerification,
     reload
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { 
@@ -38,7 +34,7 @@ function checkRateLimit(action, limit = 5) {
     }
     
     if (rateLimitCounter[action] >= limit) {
-        throw new Error(`Çok fazla ${action} denemesi. Lütfen 1 dakika bekleyin.`);
+        throw new Error(`Çok fazla ${action} denemesi. Lütfen 1 dakita bekleyin.`);
     }
     
     rateLimitCounter[action]++;
@@ -96,29 +92,28 @@ const turkeyData = {
     'Bursa': ['Büyükorhan', 'Gemlik', 'Gürsu', 'Harmancık', 'İnegöl', 'İznik', 'Karacabey', 'Keles', 'Kestel', 'Mudanya', 'Mustafakemalpaşa', 'Nilüfer', 'Orhaneli', 'Orhangazi', 'Osmangazi', 'Yenişehir', 'Yıldırım']
 };
 
-function validateLocation(city, district) {
-    return turkeyData[city] && turkeyData[city].includes(district);
-}
-
 let currentUser = null;
 let isAuthListenerActive = false;
 
 export function initializeAuth() {
     if (isAuthListenerActive) {
-        console.log('🔄 Auth listener zaten aktif');
         return;
     }
     
-    console.log('🚀 Firebase Auth başlatılıyor...');
-    
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            console.log('✅ Kullanıcı giriş yaptı:', user.email);
             currentUser = user;
-            showUserInterface();
             
+            const verificationStatus = await checkUserVerificationStatus(user.uid);
+            
+            if (!verificationStatus.verified) {
+                showEmailVerificationWarning();
+                await loadUserProfile(user);
+            } else {
+                showUserInterface();
+                await loadUserProfile(user);
+            }
         } else {
-            console.log('❌ Kullanıcı çıkış yaptı veya giriş yapmamış');
             currentUser = null;
             hideEmailVerificationWarning();
             showAuthInterface();
@@ -126,7 +121,6 @@ export function initializeAuth() {
     });
     
     isAuthListenerActive = true;
-    console.log('👂 Auth state listener aktif edildi');
 }
 
 function showEmailVerificationWarning() {
@@ -136,7 +130,6 @@ function showEmailVerificationWarning() {
     const warningDiv = document.getElementById('emailVerificationWarning');
     if (warningDiv) {
         warningDiv.style.display = 'block';
-        console.log('⚠️ E-posta doğrulama uyarısı gösterildi');
     }
 }
 
@@ -144,7 +137,6 @@ function hideEmailVerificationWarning() {
     const warningDiv = document.getElementById('emailVerificationWarning');
     if (warningDiv) {
         warningDiv.style.display = 'none';
-        console.log('✅ E-posta doğrulama uyarısı gizlendi');
     }
 }
 
@@ -155,12 +147,10 @@ function showUserInterface() {
     
     if (authButtons) {
         authButtons.style.display = 'none';
-        console.log('🔒 Auth butonları gizlendi');
     }
     
     if (userProfile) {
         userProfile.classList.add('active');
-        console.log('👤 Kullanıcı profili gösterildi');
     }
 }
 
@@ -168,7 +158,6 @@ function hideUserInterface() {
     const userProfile = document.querySelector('.user-profile');
     if (userProfile) {
         userProfile.classList.remove('active');
-        console.log('👤 Kullanıcı profili gizlendi');
     }
 }
 
@@ -179,12 +168,10 @@ function showAuthInterface() {
     
     if (authButtons) {
         authButtons.style.display = 'flex';
-        console.log('🔓 Auth butonları gösterildi');
     }
     
     if (userProfile) {
         userProfile.classList.remove('active');
-        console.log('👤 Kullanıcı profili gizlendi');
     }
 }
 
@@ -192,25 +179,33 @@ function hideAuthInterface() {
     const authButtons = document.querySelector('.auth-buttons');
     if (authButtons) {
         authButtons.style.display = 'none';
-        console.log('🔒 Auth butonları gizlendi');
     }
 }
 
 async function loadUserProfile(user) {
     try {
-        console.log('📄 Kullanıcı profili yükleniyor...', user.uid);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        let userData = {
+            name: user.displayName || user.email.split('@')[0],
+            email: user.email
+        };
+        
+        if (userDoc.exists()) {
+            const firestoreData = userDoc.data();
+            userData.name = firestoreData.name || userData.name;
+        }
+        
+        updateUserDisplay(userData);
+    } catch (error) {
+        console.error('Profile load error:', error);
         updateUserDisplay({
             name: user.displayName || user.email.split('@')[0],
             email: user.email
         });
-    } catch (error) {
-        console.error('❌ Kullanıcı profili yüklenirken hata:', error);
     }
 }
 
 function updateUserDisplay(userData) {
-    console.log('🔄 Kullanıcı gösterimi güncelleniyor:', userData);
-    
     const userAvatar = document.querySelector('.user-avatar');
     if (userAvatar && userData.name) {
         const initials = userData.name
@@ -220,13 +215,11 @@ function updateUserDisplay(userData) {
             .toUpperCase()
             .substring(0, 2);
         userAvatar.textContent = initials;
-        console.log('👤 Avatar güncellendi:', initials);
     }
     
     const userNameInNavbar = document.querySelector('.navbar-right .user-name');
     if (userNameInNavbar && userData.name) {
         userNameInNavbar.textContent = sanitizeInput(userData.name);
-        console.log('📝 Navbar kullanıcı adı güncellendi:', userData.name);
     }
     
     const dropdownUserName = document.querySelector('.user-dropdown .dropdown-header .user-name');
@@ -234,27 +227,23 @@ function updateUserDisplay(userData) {
     
     if (dropdownUserName && userData.name) {
         dropdownUserName.textContent = sanitizeInput(userData.name);
-        console.log('📋 Dropdown kullanıcı adı güncellendi:', userData.name);
     }
     
     if (dropdownUserEmail && userData.email) {
         dropdownUserEmail.textContent = sanitizeInput(userData.email);
-        console.log('📧 Dropdown email güncellendi:', userData.email);
     }
     
     const allUserNames = document.querySelectorAll('.user-name');
-    allUserNames.forEach((element, index) => {
+    allUserNames.forEach((element) => {
         if (userData.name) {
             element.textContent = sanitizeInput(userData.name);
-            console.log(`📝 User name ${index + 1} güncellendi:`, userData.name);
         }
     });
     
     const allUserEmails = document.querySelectorAll('.user-email');
-    allUserEmails.forEach((element, index) => {
+    allUserEmails.forEach((element) => {
         if (userData.email) {
             element.textContent = sanitizeInput(userData.email);
-            console.log(`📧 User email ${index + 1} güncellendi:`, userData.email);
         }
     });
 }
@@ -271,11 +260,9 @@ export async function registerUser(userData) {
             password: userData.password
         };
         
-        console.log('📝 Kullanıcı kaydı başlatılıyor:', sanitizedData.email);
         showLoading('register');
         hideAuthError('register');
         
-        // Validasyonlar
         if (!validateEmail(sanitizedData.email)) {
             throw new Error('Geçersiz e-posta formatı.');
         }
@@ -285,8 +272,6 @@ export async function registerUser(userData) {
             throw new Error(passwordValidation.error);
         }
         
-        // Firebase'da kullanıcı oluştur
-        console.log('🔥 Firebase Auth kullanıcısı oluşturuluyor...');
         const userCredential = await createUserWithEmailAndPassword(
             auth, 
             sanitizedData.email, 
@@ -294,45 +279,35 @@ export async function registerUser(userData) {
         );
         const user = userCredential.user;
         
-        // Profil güncelle
         await updateProfile(user, {
             displayName: sanitizedData.name
         });
         
-        // Kullanıcı verilerini Firestore'a kaydet
         await setDoc(doc(db, 'users', user.uid), {
             name: sanitizedData.name,
             email: sanitizedData.email,
             city: sanitizedData.city,
             district: sanitizedData.district,
             createdAt: new Date(),
-            emailVerified: false, // Başlangıçta false
+            emailVerified: false,
             isActive: true
         });
         
-        // Firebase'in built-in email verification'ını kullan
-        await sendEmailVerification(user, {
-            url: `${window.location.origin}/`, // Verification sonrası yönlendirme
-            handleCodeInApp: false
-        });
-        
-        console.log('✅ Kullanıcı oluşturuldu ve doğrulama e-postası gönderildi');
+        await sendVerificationEmail(user.uid, sanitizedData.email, sanitizedData.name);
         
         hideLoading('register');
         showAuthSuccess('register', 
             `🎉 Hesabınız başarıyla oluşturuldu!\n\n` +
-            `${sanitizedData.email} adresine doğrulama e-postası gönderdik.\n\n` +
-            `Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.\n\n` +
-            `Doğrulama sonrası giriş yapabilirsiniz.`
+            `${sanitizedData.email} adresine özel tasarım doğrulama e-postası gönderdik.\n\n` +
+            `Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.`
         );
         
         setTimeout(() => {
             closeAuthModal('register');
-            openAuthModal('login'); // Doğrudan login modalını aç
-        }, 3000);
+        }, 4000);
         
     } catch (error) {
-        console.error('❌ Kayıt hatası:', error);
+        console.error('Registration error:', error);
         hideLoading('register');
         
         let errorMessage = 'Kayıt sırasında bir hata oluştu.';
@@ -359,7 +334,6 @@ export async function loginUser(email, password) {
     try {
         checkRateLimit('login', 5);
         
-        console.log('🔑 Kullanıcı girişi başlatılıyor:', email);
         showLoading('login');
         hideAuthError('login');
         
@@ -372,7 +346,7 @@ export async function loginUser(email, password) {
         const userCredential = await signInWithEmailAndPassword(auth, sanitizedEmail, password);
         const user = userCredential.user;
         
-        console.log('✅ Firebase auth başarılı:', user.uid);
+        const verificationStatus = await checkUserVerificationStatus(user.uid);
         
         hideLoading('login');
         showAuthSuccess('login', '🎉 Giriş başarılı! Hoş geldiniz!');
@@ -382,7 +356,7 @@ export async function loginUser(email, password) {
         }, 1000);
         
     } catch (error) {
-        console.error('❌ Giriş hatası:', error);
+        console.error('Login error:', error);
         hideLoading('login');
         
         let errorMessage = 'Giriş sırasında bir hata oluştu.';
@@ -411,7 +385,7 @@ export async function loginUser(email, password) {
     }
 }
 
-export async function resendCustomVerificationEmail() {
+export async function resendEmailVerification() {
     try {
         checkRateLimit('resendVerification', 3);
         
@@ -419,21 +393,19 @@ export async function resendCustomVerificationEmail() {
             throw new Error('Kullanıcı giriş yapmamış');
         }
         
-        console.log('📧 Özel doğrulama e-postası yeniden gönderiliyor...', currentUser.email);
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (!userDoc.exists()) {
+            throw new Error('Kullanıcı verisi bulunamadı');
+        }
         
-        const result = await sendCustomVerificationEmail(
-            currentUser.uid, 
-            currentUser.email, 
-            currentUser.displayName || 'Kullanıcı'
-        );
+        const userData = userDoc.data();
         
-        console.log('✅ Doğrulama e-postası yeniden gönderildi');
+        await resendVerificationEmail(currentUser.uid, userData.email, userData.name);
+        
         alert('✅ Doğrulama e-postası tekrar gönderildi!\n\nLütfen e-posta kutunuzu kontrol edin.');
         
-        return result;
-        
     } catch (error) {
-        console.error('❌ E-posta yeniden gönderme hatası:', error);
+        console.error('Resend verification error:', error);
         
         let errorMessage = 'E-posta gönderilirken hata oluştu.';
         
@@ -450,24 +422,24 @@ export async function resendCustomVerificationEmail() {
     }
 }
 
-export async function resendEmailVerification() {
-    return await resendCustomVerificationEmail();
-}
-
 export async function checkEmailVerification() {
     try {
         if (!currentUser) {
-            console.log('❌ Kullanıcı bulunamadı');
             alert('❌ Kullanıcı oturumu bulunamadı. Lütfen tekrar giriş yapın.');
             return;
         }
         
-        console.log('🔄 E-posta doğrulama durumu kontrol ediliyor...');
-        alert('🎉 E-posta başarıyla doğrulandı! Hoş geldiniz!');
-        location.reload();
+        const verificationStatus = await checkUserVerificationStatus(currentUser.uid);
+        
+        if (verificationStatus.verified) {
+            alert('🎉 E-posta başarıyla doğrulandı! Sayfa yenileniyor...');
+            location.reload();
+        } else {
+            alert('⚠️ E-posta henüz doğrulanmamış.\n\nLütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.\n\nE-posta spam klasörünüzde de olabilir.');
+        }
         
     } catch (error) {
-        console.error('❌ E-posta doğrulama kontrol hatası:', error);
+        console.error('Email verification check error:', error);
         
         let errorMessage = 'Kontrol sırasında hata oluştu.';
         
@@ -493,7 +465,6 @@ function openEmailVerificationModal(email) {
             emailSpan.textContent = email;
         }
         modal.classList.add('show');
-        console.log('📧 E-posta doğrulama modalı açıldı');
     }
 }
 
@@ -501,15 +472,12 @@ export function closeEmailVerificationModal() {
     const modal = document.getElementById('emailVerificationModal');
     if (modal) {
         modal.classList.remove('show');
-        console.log('📧 E-posta doğrulama modalı kapatıldı');
     }
 }
 
 export async function logoutUser() {
     try {
-        console.log('🚪 Kullanıcı çıkışı başlatılıyor...');
         await signOut(auth);
-        console.log('✅ Kullanıcı başarıyla çıkış yaptı');
         
         const dropdown = document.querySelector('.user-dropdown');
         if (dropdown) {
@@ -517,17 +485,14 @@ export async function logoutUser() {
         }
         
     } catch (error) {
-        console.error('❌ Çıkış hatası:', error);
+        console.error('Logout error:', error);
         alert('Çıkış yapılırken bir hata oluştu: ' + error.message);
     }
 }
 
 export function openAuthModal(type) {
-    console.log('🔓 Modal açılıyor:', type);
-    
     const modal = document.getElementById(`${type}Modal`);
     if (!modal) {
-        console.error('❌ Modal bulunamadı:', `${type}Modal`);
         return;
     }
     
@@ -545,28 +510,20 @@ export function openAuthModal(type) {
     if (type === 'register') {
         setTimeout(() => initializeLocationDropdowns(), 100);
     }
-    
-    console.log('✅ Modal başarıyla açıldı:', type);
 }
 
 export function closeAuthModal(type) {
-    console.log('🔒 Modal kapatılıyor:', type);
-    
     const modal = document.getElementById(`${type}Modal`);
     if (modal) {
         modal.classList.remove('show');
-        console.log('✅ Modal kapatıldı:', type);
     }
 }
 
 function initializeLocationDropdowns() {
-    console.log('🗺️ İl/İlçe dropdown\'ları başlatılıyor...');
-    
     const citySelect = document.getElementById('registerCity');
     const districtSelect = document.getElementById('registerDistrict');
     
     if (!citySelect || !districtSelect) {
-        console.error('❌ İl/İlçe dropdown elementleri bulunamadı');
         return;
     }
     
@@ -578,11 +535,8 @@ function initializeLocationDropdowns() {
         citySelect.appendChild(option);
     });
     
-    console.log('✅ İller yüklendi:', Object.keys(turkeyData).length);
-    
     citySelect.addEventListener('change', function() {
         const selectedCity = this.value;
-        console.log('🏙️ İl değişti:', selectedCity);
         
         districtSelect.innerHTML = '<option value="">İlçe Seçin</option>';
         
@@ -593,7 +547,6 @@ function initializeLocationDropdowns() {
                 option.textContent = district;
                 districtSelect.appendChild(option);
             });
-            console.log('✅ İlçeler yüklendi:', turkeyData[selectedCity].length);
         }
     });
 }
@@ -602,62 +555,7 @@ export function toggleUserDropdown() {
     const dropdown = document.querySelector('.user-dropdown');
     if (dropdown) {
         dropdown.classList.toggle('show');
-        console.log('👤 Kullanıcı dropdown toggle edildi');
     }
-}
-
-export function handleRegisterSubmit(event) {
-    event.preventDefault();
-    console.log('📝 Kayıt formu gönderiliyor...');
-    
-    const formData = {
-        name: document.getElementById('registerName').value.trim(),
-        city: document.getElementById('registerCity').value,
-        district: document.getElementById('registerDistrict').value,
-        email: document.getElementById('registerEmail').value.trim(),
-        password: document.getElementById('registerPassword').value
-    };
-    
-    console.log('📋 Form verileri:', { ...formData, password: '***' });
-    
-    if (!formData.name || !formData.city || !formData.district || !formData.email || !formData.password) {
-        showAuthError('register', 'Lütfen tüm alanları doldurun.');
-        return;
-    }
-    
-    if (!isValidEmail(formData.email)) {
-        showAuthError('register', 'Geçerli bir e-posta adresi girin.');
-        return;
-    }
-    
-    if (formData.password.length < 6) {
-        showAuthError('register', 'Şifre en az 6 karakter olmalıdır.');
-        return;
-    }
-    
-    registerUser(formData);
-}
-
-export function handleLoginSubmit(event) {
-    event.preventDefault();
-    console.log('🔑 Giriş formu gönderiliyor...');
-    
-    const email = document.getElementById('loginEmail').value.trim();
-    const password = document.getElementById('loginPassword').value;
-    
-    console.log('📧 Giriş email:', email);
-    
-    if (!email || !password) {
-        showAuthError('login', 'Lütfen e-posta ve şifrenizi girin.');
-        return;
-    }
-    
-    if (!isValidEmail(email)) {
-        showAuthError('login', 'Geçerli bir e-posta adresi girin.');
-        return;
-    }
-    
-    loginUser(email, password);
 }
 
 function isValidEmail(email) {
@@ -670,7 +568,6 @@ function showAuthError(type, message) {
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.classList.add('show');
-        console.log('❌ Hata gösterildi:', message);
     }
 }
 
@@ -686,7 +583,6 @@ function showAuthSuccess(type, message) {
     if (successElement) {
         successElement.textContent = message;
         successElement.classList.add('show');
-        console.log('✅ Başarı mesajı gösterildi:', message);
     }
 }
 
@@ -703,7 +599,6 @@ function showLoading(type) {
     
     if (loadingElement) loadingElement.classList.add('show');
     if (submitButton) submitButton.disabled = true;
-    console.log('⏳ Loading gösterildi:', type);
 }
 
 function hideLoading(type) {
@@ -712,7 +607,6 @@ function hideLoading(type) {
     
     if (loadingElement) loadingElement.classList.remove('show');
     if (submitButton) submitButton.disabled = false;
-    console.log('✅ Loading gizlendi:', type);
 }
 
 export function getCurrentUser() {
@@ -723,22 +617,22 @@ export function isUserLoggedIn() {
     return currentUser !== null;
 }
 
+export function isEmailVerified() {
+    return currentUser && currentUser.emailVerified;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📄 DOM yüklendi, event listener\'lar ekleniyor...');
-    
     document.addEventListener('click', function(event) {
         if (event.target.classList.contains('auth-modal')) {
             const modalId = event.target.id;
             const type = modalId.replace('Modal', '');
             closeAuthModal(type);
-            console.log('🖱️ Modal dışına tıklanarak kapatıldı:', type);
         }
         
         if (!event.target.closest('.user-profile')) {
             const dropdown = document.querySelector('.user-dropdown');
             if (dropdown && dropdown.classList.contains('show')) {
                 dropdown.classList.remove('show');
-                console.log('🖱️ Kullanıcı dropdown dışına tıklanarak kapatıldı');
             }
         }
     });
@@ -749,10 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (openModal) {
                 const type = openModal.id.replace('Modal', '');
                 closeAuthModal(type);
-                console.log('⌨️ ESC ile modal kapatıldı:', type);
             }
         }
     });
-    
-    console.log('✅ Event listener\'lar başarıyla eklendi');
 });
