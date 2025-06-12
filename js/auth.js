@@ -271,10 +271,11 @@ export async function registerUser(userData) {
             password: userData.password
         };
         
-        console.log('📝 Kullanıcı kaydı başlatılıyor (Özel E-posta Sistemi):', sanitizedData.email);
+        console.log('📝 Kullanıcı kaydı başlatılıyor:', sanitizedData.email);
         showLoading('register');
         hideAuthError('register');
         
+        // Validasyonlar
         if (!validateEmail(sanitizedData.email)) {
             throw new Error('Geçersiz e-posta formatı.');
         }
@@ -284,20 +285,8 @@ export async function registerUser(userData) {
             throw new Error(passwordValidation.error);
         }
         
-        if (!validateLocation(sanitizedData.city, sanitizedData.district)) {
-            throw new Error('Geçersiz il/ilçe seçimi.');
-        }
-        
+        // Firebase'da kullanıcı oluştur
         console.log('🔥 Firebase Auth kullanıcısı oluşturuluyor...');
-        
-        const tempAuthStateListener = (user) => {
-            if (user) {
-                console.log('⚠️ Kayıt sırasında auth state değişti - göz ardı ediliyor');
-            }
-        };
-        
-        const unsubscribe = onAuthStateChanged(auth, tempAuthStateListener);
-        
         const userCredential = await createUserWithEmailAndPassword(
             auth, 
             sanitizedData.email, 
@@ -305,37 +294,42 @@ export async function registerUser(userData) {
         );
         const user = userCredential.user;
         
-        console.log('✅ Firebase Auth kullanıcısı oluşturuldu:', user.uid);
-        
+        // Profil güncelle
         await updateProfile(user, {
             displayName: sanitizedData.name
         });
         
-        await signOut(auth);
-        console.log('🚪 Kullanıcı geçici olarak çıkış yaptırıldı');
+        // Kullanıcı verilerini Firestore'a kaydet
+        await setDoc(doc(db, 'users', user.uid), {
+            name: sanitizedData.name,
+            email: sanitizedData.email,
+            city: sanitizedData.city,
+            district: sanitizedData.district,
+            createdAt: new Date(),
+            emailVerified: false, // Başlangıçta false
+            isActive: true
+        });
         
-        unsubscribe();
+        // Firebase'in built-in email verification'ını kullan
+        await sendEmailVerification(user, {
+            url: `${window.location.origin}/`, // Verification sonrası yönlendirme
+            handleCodeInApp: false
+        });
         
-        console.log('📧 Özel doğrulama e-postası gönderiliyor...');
-        
-        const emailResult = await sendCustomVerificationEmail(
-            user.uid, 
-            sanitizedData.email, 
-            sanitizedData.name
-        );
-        
-        console.log('✅ Özel doğrulama e-postası gönderildi:', emailResult);
+        console.log('✅ Kullanıcı oluşturuldu ve doğrulama e-postası gönderildi');
         
         hideLoading('register');
         showAuthSuccess('register', 
             `🎉 Hesabınız başarıyla oluşturuldu!\n\n` +
             `${sanitizedData.email} adresine doğrulama e-postası gönderdik.\n\n` +
-            `Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.`
+            `Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.\n\n` +
+            `Doğrulama sonrası giriş yapabilirsiniz.`
         );
         
         setTimeout(() => {
             closeAuthModal('register');
-        }, 4000);
+            openAuthModal('login'); // Doğrudan login modalını aç
+        }, 3000);
         
     } catch (error) {
         console.error('❌ Kayıt hatası:', error);
@@ -352,9 +346,6 @@ export async function registerUser(userData) {
                 break;
             case 'auth/invalid-email':
                 errorMessage = 'Geçersiz e-posta adresi formatı.';
-                break;
-            case 'auth/operation-not-allowed':
-                errorMessage = 'E-posta/şifre ile kayıt aktif değil.';
                 break;
             default:
                 errorMessage = error.message || errorMessage;
