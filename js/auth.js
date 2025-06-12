@@ -4,6 +4,8 @@ import { auth, db, securityConfig } from './firebase-config.js';
 
 console.log('🔗 Auth modülü Firebase config\'i import etti');
 
+import { sendCustomVerificationEmail } from './email-sender.js';
+
 import { 
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword,
@@ -288,6 +290,7 @@ function updateUserDisplay(userData) {
     });
 }
 
+
 export async function registerUser(userData) {
     try {
         checkRateLimit('register', 3);
@@ -300,7 +303,7 @@ export async function registerUser(userData) {
             password: userData.password
         };
         
-        console.log('📝 Kullanıcı kaydı başlatılıyor:', sanitizedData.email);
+        console.log('📝 Kullanıcı kaydı başlatılıyor (Özel E-posta Sistemi):', sanitizedData.email);
         showLoading('register');
         hideAuthError('register');
         
@@ -330,13 +333,6 @@ export async function registerUser(userData) {
             displayName: sanitizedData.name
         });
         
-        try {
-            await sendEmailVerification(user);
-            console.log('📧 E-posta doğrulama gönderildi:', user.email);
-        } catch (verifyError) {
-            console.warn('⚠️ E-posta doğrulama gönderilemedi:', verifyError);
-        }
-        
         const userDocData = {
             name: sanitizedData.name,
             email: sanitizedData.email,
@@ -344,18 +340,47 @@ export async function registerUser(userData) {
             district: sanitizedData.district,
             createdAt: new Date(),
             lastLogin: new Date(),
-            emailVerified: false
+            emailVerified: false,
+            registrationMethod: 'custom_email_verification'
         };
         
         await setDoc(doc(db, 'users', user.uid), userDocData);
         console.log('✅ Kullanıcı Firestore\'a kaydedildi');
         
-        hideLoading('register');
-        showAuthSuccess('register', 'Hesabınız oluşturuldu! Lütfen e-posta adresinizi kontrol edin ve doğrulama linkine tıklayın.');
-        
-        setTimeout(() => {
-            closeAuthModal('register');
-        }, 3000);
+        try {
+            console.log('📧 Özel doğrulama e-postası gönderiliyor...');
+            
+            const emailResult = await sendCustomVerificationEmail(
+                user.uid, 
+                sanitizedData.email, 
+                sanitizedData.name
+            );
+            
+            console.log('✅ Özel doğrulama e-postası gönderildi:', emailResult);
+            
+            hideLoading('register');
+            showAuthSuccess('register', 
+                `Hesabınız oluşturuldu! ${sanitizedData.email} adresine doğrulama e-postası gönderdik. ` +
+                'Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.'
+            );
+            
+            setTimeout(() => {
+                closeAuthModal('register');
+            }, 4000);
+            
+        } catch (emailError) {
+            console.error('⚠️ E-posta gönderme hatası:', emailError);
+            
+            hideLoading('register');
+            showAuthSuccess('register', 
+                'Hesabınız oluşturuldu ancak doğrulama e-postası gönderilemedi. ' +
+                'Lütfen giriş yapıp "E-posta Tekrar Gönder" butonunu kullanın.'
+            );
+            
+            setTimeout(() => {
+                closeAuthModal('register');
+            }, 5000);
+        }
         
     } catch (error) {
         console.error('❌ Kayıt hatası:', error);
@@ -384,11 +409,12 @@ export async function registerUser(userData) {
     }
 }
 
+
 export async function loginUser(email, password) {
     try {
         checkRateLimit('login', 5);
         
-        console.log('🔑 Kullanıcı girişi başlatılıyor:', email);
+        console.log('🔑 Kullanıcı girişi başlatılıyor (Özel E-posta Sistemi):', email);
         showLoading('login');
         hideAuthError('login');
         
@@ -402,30 +428,47 @@ export async function loginUser(email, password) {
         const user = userCredential.user;
         
         console.log('✅ Firebase auth başarılı:', user.uid);
-        console.log('📧 E-posta doğrulama durumu:', user.emailVerified);
         
-        if (!user.emailVerified) {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        
+        if (!userDoc.exists()) {
+            console.warn('⚠️ Kullanıcı Firestore\'da bulunamadı, oluşturuluyor...');
+            
+            await setDoc(doc(db, 'users', user.uid), {
+                name: user.displayName || user.email.split('@')[0],
+                email: user.email,
+                createdAt: new Date(),
+                lastLogin: new Date(),
+                emailVerified: false,
+                migrated: true
+            });
+        }
+        
+        const userData = userDoc.exists() ? userDoc.data() : null;
+        const isEmailVerified = userData?.emailVerified || false;
+        console.log('📧 E-posta doğrulama durumu (Firestore):', isEmailVerified);
+        if (!isEmailVerified) {
             console.log('❌ E-posta doğrulanmamış, giriş engellendi');
             
             await signOut(auth);
-            
             hideLoading('login');
-            showAuthError('login', 'E-posta adresinizi henüz doğrulamadınız. Lütfen e-posta kutunuzu kontrol edin.');
-            
+            showAuthError('login', 
+                'E-posta adresinizi henüz doğrulamadınız. ' +
+                'Lütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.'
+            );
             setTimeout(() => {
                 closeAuthModal('login');
-                openEmailVerificationModal(user.email);
+                showCustomVerificationModal(user.email, user.uid, userData?.name || 'Kullanıcı');
             }, 2000);
-            
             return;
         }
         
-        console.log('✅ Giriş başarılı:', user.uid);
+        console.log('✅ Giriş başarılı (E-posta doğrulanmış):', user.uid);
         
         try {
             await updateDoc(doc(db, 'users', user.uid), {
                 lastLogin: new Date(),
-                emailVerified: true
+                emailVerified: true 
             });
             console.log('✅ Son giriş zamanı güncellendi');
         } catch (updateError) {
@@ -466,6 +509,71 @@ export async function loginUser(email, password) {
         }
         
         showAuthError('login', errorMessage);
+    }
+}
+
+function showCustomVerificationModal(email, userId, name) {
+    console.log('📧 Özel doğrulama modal\'ı gösteriliyor:', email);
+    
+    const modal = document.getElementById('emailVerificationModal');
+    if (modal) {
+        const emailSpan = modal.querySelector('.verification-email');
+        if (emailSpan) {
+            emailSpan.textContent = email;
+        }
+        
+        modal.setAttribute('data-user-id', userId);
+        modal.setAttribute('data-user-email', email);
+        modal.setAttribute('data-user-name', name);
+        
+        modal.classList.add('show');
+        console.log('✅ Doğrulama modal\'ı açıldı');
+    } else {
+        alert(`E-posta doğrulama gerekli!\n\n${email} adresine gönderilen doğrulama linkine tıklayın.`);
+    }
+}
+
+export async function resendCustomVerificationEmail() {
+    try {
+        checkRateLimit('resendVerification', 3);
+        
+        const modal = document.getElementById('emailVerificationModal');
+        if (!modal) {
+            throw new Error('Modal bulunamadı');
+        }
+        
+        const userId = modal.getAttribute('data-user-id');
+        const email = modal.getAttribute('data-user-email');
+        const name = modal.getAttribute('data-user-name');
+        
+        if (!userId || !email) {
+            throw new Error('Kullanıcı bilgileri bulunamadı');
+        }
+        
+        console.log('📧 Özel doğrulama e-postası yeniden gönderiliyor...', email);
+        
+        const result = await sendCustomVerificationEmail(userId, email, name);
+        
+        console.log('✅ Doğrulama e-postası yeniden gönderildi');
+        alert('✅ Doğrulama e-postası tekrar gönderildi! Lütfen e-posta kutunuzu kontrol edin.');
+        
+        return result;
+        
+    } catch (error) {
+        console.error('❌ E-posta yeniden gönderme hatası:', error);
+        
+        let errorMessage = 'E-posta gönderilirken hata oluştu.';
+        
+        switch (error.code) {
+            case 'auth/too-many-requests':
+                errorMessage = 'Çok fazla e-posta gönderildi. Lütfen daha sonra tekrar deneyin.';
+                break;
+            default:
+                errorMessage = error.message || errorMessage;
+        }
+        
+        alert('❌ ' + errorMessage);
+        throw error;
     }
 }
 

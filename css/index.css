@@ -135,7 +135,6 @@ body {
     margin: 4px 0;
 }
 
-/* Navbar sağ taraf - Authentication alanı */
 .navbar-right {
     margin-left: auto;
     display: flex;
@@ -177,7 +176,6 @@ body {
     box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
 }
 
-/* Kullanıcı profil alanı */
 .user-profile {
     display: none;
     align-items: center;
@@ -222,7 +220,6 @@ body {
     background: #f8f9fa;
 }
 
-/* Kullanıcı dropdown menüsü */
 .user-dropdown {
     display: none;
     position: absolute;
@@ -605,7 +602,7 @@ td.row-checkbox-cell input[type="checkbox"] {
     color: #000;
 }
 
-/* Responsive tasarım */
+
 @media (max-width: 768px) {
     .container {
         margin: 10px;
@@ -673,7 +670,6 @@ td.row-checkbox-cell input[type="checkbox"] {
     }
 }
 
-/* Tablet responsive */
 @media (max-width: 1024px) and (min-width: 769px) {
     .navbar-right {
         gap: 8px;
@@ -687,4 +683,9 @@ td.row-checkbox-cell input[type="checkbox"] {
     .user-name {
         font-size: 13px;
     }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }

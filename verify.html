@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-posta Doğrulama - Tabledit</title>
+    <link rel="stylesheet" type="text/css" href="css/index.css">
+    <link rel="stylesheet" type="text/css" href="css/auth.css">
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .verify-container {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .verify-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #3498db, #2980b9, #27ae60, #f39c12, #e74c3c);
+        }
+        
+        .verify-icon {
+            font-size: 100px;
+            margin-bottom: 30px;
+            display: block;
+        }
+        
+        .verify-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        
+        .verify-message {
+            color: #555;
+            font-size: 18px;
+            line-height: 1.8;
+            margin-bottom: 40px;
+        }
+        
+        .verify-email {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+        }
+        
+        .verify-btn {
+            background: linear-gradient(45deg, #27ae60, #229954);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        
+        .verify-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(39, 174, 96, 0.4);
+        }
+        
+        .verify-btn.secondary {
+            background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+        }
+        
+        .verify-btn.secondary:hover {
+            box-shadow: 0 10px 25px rgba(149, 165, 166, 0.4);
+        }
+        
+        .loading-container {
+            margin: 30px 0;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        
+        .status-success {
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
+            border: 2px solid #27ae60;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: linear-gradient(45deg, #f8d7da, #f5c6cb);
+            border: 2px solid #e74c3c;
+            color: #721c24;
+        }
+        
+        .status-warning {
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+            border: 2px solid #f39c12;
+            color: #856404;
+        }
+        
+        .logo-section {
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            max-height: 80px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .verify-container {
+                padding: 30px 20px;
+                margin: 20px;
+            }
+            
+            .verify-icon {
+                font-size: 80px;
+                margin-bottom: 20px;
+            }
+            
+            .verify-title {
+                font-size: 24px;
+                margin-bottom: 15px;
+            }
+            
+            .verify-message {
+                font-size: 16px;
+                margin-bottom: 30px;
+            }
+            
+            .verify-btn {
+                padding: 12px 30px;
+                font-size: 16px;
+                width: 100%;
+                margin: 5px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="verify-container">
+        <div class="logo-section">
+            <img src="img/agd_logo.png" alt="Logo" class="logo">
+        </div>
+
+        <div id="loadingState">
+            <div class="verify-icon">⏳</div>
+            <h1 class="verify-title">E-posta Doğrulanıyor...</h1>
+            <div class="verify-message">
+                Lütfen bekleyin, e-posta adresiniz doğrulanıyor.
+            </div>
+            <div class="loading-container">
+                <div class="loading-spinner"></div>
+                <p>Doğrulama işlemi devam ediyor...</p>
+            </div>
+        </div>
+
+        <div id="successState" style="display: none;">
+            <div class="verify-icon">🎉</div>
+            <h1 class="verify-title">Tebrikler!</h1>
+            <div class="verify-message">
+                <span class="verify-email" id="verifiedEmail">email@example.com</span> 
+                adresiniz başarıyla doğrulandı!
+            </div>
+            <div class="status-box status-success">
+                <strong>✅ Hesabınız aktifleştirildi!</strong><br>
+                Artık Tabledit'in tüm özelliklerini kullanabilirsiniz.
+            </div>
+            <a href="/" class="verify-btn">
+                🏠 Ana Sayfaya Git
+            </a>
+        </div>
+
+        <div id="errorState" style="display: none;">
+            <div class="verify-icon">❌</div>
+            <h1 class="verify-title">Doğrulama Başarısız</h1>
+            <div class="verify-message">
+                E-posta doğrulama sırasında bir sorun oluştu.
+            </div>
+            <div class="status-box status-error" id="errorDetails">
+                Doğrulama linki geçersiz veya süresi dolmuş olabilir.
+            </div>
+            <div>
+                <a href="/" class="verify-btn secondary">
+                    🏠 Ana Sayfaya Dön
+                </a>
+                <button onclick="retryVerification()" class="verify-btn">
+                    🔄 Tekrar Dene
+                </button>
+            </div>
+        </div>
+
+        <div id="noTokenState" style="display: none;">
+            <div class="verify-icon">🔍</div>
+            <h1 class="verify-title">Geçersiz Link</h1>
+            <div class="verify-message">
+                Bu sayfa sadece e-posta doğrulama linkleri için kullanılır.
+            </div>
+            <div class="status-box status-warning">
+                <strong>⚠️ Doğrulama token'ı bulunamadı!</strong><br>
+                Lütfen e-posta kutunuzdaki doğrulama linkini kullanın.
+            </div>
+            <a href="/" class="verify-btn">
+                🏠 Ana Sayfaya Git
+            </a>
+        </div>
+    </div>
+
+    <script type="module" src="js/email-verification.js"></script>
+    
+    <script>
+        window.retryVerification = function() {
+            location.reload();
+        }
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        window.verificationToken = urlParams.get('token');
+        
+        console.log('🔍 Doğrulama token:', window.verificationToken ? 'Mevcut' : 'Yok');
+        
+        if (!window.verificationToken) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('noTokenState').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

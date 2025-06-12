@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-posta Doğrulama - Tabledit</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.7;
+            color: #2d3748;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        
+        .email-wrapper {
+            max-width: 680px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 
+                0 32px 64px rgba(0, 0, 0, 0.15),
+                0 16px 32px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .email-header {
+            position: relative;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 75%, #533483 100%);
+            padding: 60px 40px;
+            text-align: center;
+            overflow: hidden;
+        }
+        
+        .email-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+            animation: gradientShift 6s ease-in-out infinite alternate;
+        }
+        
+        @keyframes gradientShift {
+            0% { transform: translateX(0) translateY(0) scale(1); }
+            100% { transform: translateX(-20px) translateY(-10px) scale(1.05); }
+        }
+        
+        .logo-container {
+            position: relative;
+            z-index: 2;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: white;
+            font-weight: 800;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
+            border: 3px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header-title {
+            position: relative;
+            z-index: 2;
+            color: #ffffff;
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, #ffffff, #e2e8f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header-subtitle {
+            position: relative;
+            z-index: 2;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 18px;
+            font-weight: 500;
+            opacity: 0.95;
+        }
+        
+        .floating-shapes {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        
+        .shape {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 15s infinite linear;
+        }
+        
+        .shape:nth-child(1) {
+            width: 100px;
+            height: 100px;
+            top: 20%;
+            left: 10%;
+            animation-duration: 20s;
+            animation-delay: 0s;
+        }
+        
+        .shape:nth-child(2) {
+            width: 60px;
+            height: 60px;
+            top: 60%;
+            right: 15%;
+            animation-duration: 15s;
+            animation-delay: 5s;
+        }
+        
+        .shape:nth-child(3) {
+            width: 80px;
+            height: 80px;
+            bottom: 20%;
+            left: 20%;
+            animation-duration: 18s;
+            animation-delay: 2s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.1; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.3; }
+        }
+        
+        .email-content {
+            padding: 50px 40px;
+            position: relative;
+        }
+        
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .welcome-emoji {
+            font-size: 64px;
+            margin-bottom: 24px;
+            display: block;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .welcome-title {
+            font-size: 32px;
+            color: #1a202c;
+            margin-bottom: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .welcome-message {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #4a5568;
+            margin-bottom: 30px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .user-email-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 16px;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            margin: 0 8px;
+        }
+        
+        .cta-section {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            margin: 40px 0;
+            border: 2px solid rgba(102, 126, 234, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #667eea);
+            background-size: 200% 100%;
+            animation: shimmer 3s ease-in-out infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .cta-title {
+            font-size: 24px;
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        .cta-subtitle {
+            font-size: 16px;
+            color: #718096;
+            margin-bottom: 35px;
+            line-height: 1.6;
+        }
+        
+        .verify-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+            text-decoration: none;
+            padding: 18px 48px;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 
+                0 12px 40px rgba(72, 187, 120, 0.4),
+                0 8px 16px rgba(72, 187, 120, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .verify-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .verify-button:hover {
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 
+                0 20px 60px rgba(72, 187, 120, 0.5),
+                0 12px 24px rgba(72, 187, 120, 0.3);
+        }
+        
+        .verify-button:hover::before {
+            left: 100%;
+        }
+        
+        .features-section {
+            margin: 50px 0;
+        }
+        
+        .features-title {
+            text-align: center;
+            font-size: 28px;
+            color: #2d3748;
+            margin-bottom: 40px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 30px;
+        }
+        
+        .feature-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 20px;
+            padding: 30px 24px;
+            text-align: center;
+            border: 2px solid rgba(102, 126, 234, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(102, 126, 234, 0.3);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+        }
+        
+        .feature-card:hover::before {
+            transform: scaleX(1);
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: block;
+            filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.2));
+        }
+        
+        .feature-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 12px;
+        }
+        
+        .feature-description {
+            font-size: 15px;
+            color: #718096;
+            line-height: 1.6;
+        }
+        
+        .info-section {
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 20%, #fff5f5 100%);
+            border: 2px solid #feb2b2;
+            border-radius: 16px;
+            padding: 28px;
+            margin: 40px 0;
+            position: relative;
+        }
+        
+        .info-title {
+            color: #c53030;
+            font-weight: 700;
+            margin-bottom: 12px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .info-text {
+            color: #742a2a;
+            font-size: 15px;
+            line-height: 1.7;
+            margin: 0;
+        }
+        
+        .link-section {
+            background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 20%, #ebf8ff 100%);
+            border: 2px solid #90cdf4;
+            border-radius: 16px;
+            padding: 28px;
+            margin: 30px 0;
+        }
+        
+        .link-title {
+            color: #2c5282;
+            font-weight: 700;
+            margin-bottom: 16px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .manual-link {
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid #90cdf4;
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            color: #2c5282;
+            word-break: break-all;
+            line-height: 1.5;
+            margin-top: 12px;
+        }
+        
+        .email-footer {
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            color: #e2e8f0;
+            padding: 50px 40px 40px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .footer-logo {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .footer-tagline {
+            font-size: 16px;
+            color: #a0aec0;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .social-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: #e2e8f0;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .social-link:hover {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .footer-text {
+            font-size: 14px;
+            color: #718096;
+            line-height: 1.6;
+            margin: 8px 0;
+        }
+        
+        .footer-copyright {
+            font-size: 12px;
+            color: #4a5568;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #4a5568;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .email-wrapper {
+                margin: 10px;
+                border-radius: 16px;
+            }
+            
+            .email-header,
+            .email-content,
+            .email-footer {
+                padding: 30px 24px;
+            }
+            
+            .header-title {
+                font-size: 32px;
+            }
+            
+            .welcome-title {
+                font-size: 24px;
+            }
+            
+            .verify-button {
+                padding: 16px 32px;
+                font-size: 16px;
+                width: 100%;
+                max-width: 300px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .user-email-badge {
+                display: block;
+                margin: 16px 0;
+            }
+            
+            .social-links {
+                flex-wrap: wrap;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .email-header,
+            .email-content,
+            .email-footer {
+                padding: 24px 20px;
+            }
+            
+            .header-title {
+                font-size: 28px;
+            }
+            
+            .welcome-emoji {
+                font-size: 48px;
+            }
+            
+            .cta-section,
+            .info-section,
+            .link-section {
+                padding: 24px 20px;
+            }
+        }
+        
+        @media print {
+            body {
+                background: white !important;
+            }
+            
+            .email-wrapper {
+                box-shadow: none !important;
+                border: 1px solid #e2e8f0 !important;
+            }
+            
+            .verify-button {
+                background: #48bb78 !important;
+                color: white !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-header">
+            <div class="floating-shapes">
+                <div class="shape"></div>
+                <div class="shape"></div>
+                <div class="shape"></div>
+            </div>
+            
+            <div class="logo-container">
+                <div class="logo">📊</div>
+            </div>
+            
+            <h1 class="header-title">Hoş Geldiniz!</h1>
+            <p class="header-subtitle">Tabledit ailesine katıldığınız için teşekkürler</p>
+        </div>
+        
+        <div class="email-content">
+            <div class="welcome-section">
+                <span class="welcome-emoji">🎉</span>
+                <h2 class="welcome-title">Merhaba {{USER_NAME}}!</h2>
+                <div class="welcome-message">
+                    <span class="user-email-badge">{{USER_EMAIL}}</span> 
+                    adresli e-posta hesabınızla <strong>Tabledit</strong>'e başarıyla kaydoldunuz!
+                </div>
+            </div>
+            
+            <div class="cta-section">
+                <h3 class="cta-title">🚀 Hesabınızı Aktifleştirin</h3>
+                <p class="cta-subtitle">
+                    Tabledit'in tüm özelliklerini kullanmaya başlamak için 
+                    e-posta adresinizi doğrulamanız gerekiyor.
+                </p>
+                <a href="{{VERIFICATION_URL}}" class="verify-button">
+                    ✅ E-postamı Doğrula
+                </a>
+            </div>
+            
+            <div class="features-section">
+                <h3 class="features-title">🌟 Tabledit ile Neler Yapabilirsiniz?</h3>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">📊</span>
+                        <h4 class="feature-title">Excel Uyumluluğu</h4>
+                        <p class="feature-description">Excel dosyalarını kolayca yükleyin, düzenleyin ve dışa aktarın</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🎨</span>
+                        <h4 class="feature-title">Akıllı Renklendirme</h4>
+                        <p class="feature-description">Hücreleri, satırları ve sütunları istediğiniz gibi renklendirin</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">☁️</span>
+                        <h4 class="feature-title">Bulut Depolama</h4>
+                        <p class="feature-description">Tablolarınız güvenle bulutta saklanır ve her yerden erişilebilir</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🔄</span>
+                        <h4 class="feature-title">Gerçek Zamanlı</h4>
+                        <p class="feature-description">Değişiklikler anında kaydedilir, veri kaybı yaşamazsınız</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="link-section">
+                <div class="link-title">
+                    <span>🔗</span>
+                    <span>Buton çalışmıyorsa</span>
+                </div>
+                <p>Aşağıdaki linki kopyalayıp tarayıcınızın adres çubuğuna yapıştırın:</p>
+                <div class="manual-link">{{VERIFICATION_URL}}</div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-title">
+                    <span>🔒</span>
+                    <span>Güvenlik Bilgisi</span>
+                </div>
+                <p class="info-text">
+                    Bu doğrulama linki <strong>24 saat</strong> geçerlidir ve sadece <strong>bir kez</strong> kullanılabilir. 
+                    Hesabınızın güvenliği için bu e-postayı kimseyle paylaşmayın. 
+                    Eğer bu e-postayı siz talep etmediyseniz güvenle silebilirsiniz.
+                </p>
+            </div>
+        </div>
+        
+        <div class="email-footer">
+            <div class="footer-logo">📊 Tabledit</div>
+            <p class="footer-tagline">Modern Tablo Düzenleme Sistemi</p>
+            
+            <div class="social-links">
+                <a href="#" class="social-link" title="Destek">📧</a>
+                <a href="#" class="social-link" title="Yardım">📖</a>
+                <a href="#" class="social-link" title="Website">🌐</a>
+                <a href="#" class="social-link" title="GitHub">💻</a>
+            </div>
+            
+            <p class="footer-text">Bu e-posta otomatik olarak gönderilmiştir, lütfen yanıtlamayın.</p>
+            <p class="footer-text">Herhangi bir sorunuz varsa destek ekibimizle iletişime geçin.</p>
+            
+            <div class="footer-copyright">
+                Tabledit © {{CURRENT_YEAR}} - Tüm hakları saklıdır.<br>
+                Bu e-postayı almak istemiyorsanız hesabınızı silebilirsiniz.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

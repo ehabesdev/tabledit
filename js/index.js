@@ -1199,6 +1199,85 @@ window.createNewFile = function () {
     alert('Yeni dosya özelliği yakında gelecek!');
 }
 
+window.resendVerificationEmail = function() {
+    import('./auth.js').then(module => {
+        module.resendCustomVerificationEmail();
+    }).catch(error => {
+        console.error('Auth modülü yüklenemedi:', error);
+        alert('E-posta gönderilirken hata oluştu. Sayfayı yenileyin.');
+    });
+}
+
+window.checkEmailVerificationStatus = function() {
+    import('./email-verification.js').then(module => {
+        import('./auth.js').then(authModule => {
+            const currentUser = authModule.getCurrentUser();
+            if (currentUser) {
+                module.checkUserVerificationStatus(currentUser.uid).then(status => {
+                    if (status.verified) {
+                        alert('🎉 E-posta başarıyla doğrulandı! Sayfa yenileniyor...');
+                        location.reload();
+                    } else {
+                        alert('⚠️ E-posta henüz doğrulanmamış. Lütfen e-posta kutunuzu kontrol edin.');
+                    }
+                });
+            } else {
+                alert('❌ Kullanıcı oturumu bulunamadı.');
+            }
+        });
+    }).catch(error => {
+        console.error('E-posta doğrulama modülü yüklenemedi:', error);
+        alert('Kontrol edilirken hata oluştu. Sayfayı yenileyin.');
+    });
+}
+
+window.closeEmailVerificationModal = function() {
+    import('./auth.js').then(module => {
+        module.closeEmailVerificationModal();
+    }).catch(error => {
+        console.error('Auth modülü yüklenemedi:', error);
+    });
+}
+
+window.testCustomEmailSystem = function() {
+    console.log('🧪 Özel e-posta sistemi test ediliyor...');
+    
+    import('./email-sender.js').then(emailModule => {
+        import('./email-verification.js').then(verifyModule => {
+            console.log('✅ E-posta modülleri yüklendi');
+            console.log('📧 E-posta gönderici:', emailModule);
+            console.log('🔍 E-posta doğrulayıcı:', verifyModule);
+            
+            const testToken = 'test_' + Date.now();
+            console.log('🔑 Test token:', testToken);
+            
+            alert('✅ Özel e-posta sistemi modülleri başarıyla yüklendi! Console\'u kontrol edin.');
+        });
+    }).catch(error => {
+        console.error('❌ E-posta modülleri yüklenemedi:', error);
+        alert('❌ Test başarısız: ' + error.message);
+    });
+}
+
+window.cleanupExpiredTokens = function() {
+    if (!confirm('Süresi dolmuş doğrulama token\'larını temizlemek istediğinizden emin misiniz?')) {
+        return;
+    }
+    
+    import('./email-verification.js').then(module => {
+        module.cleanupExpiredTokens().then(count => {
+            if (count >= 0) {
+                alert(`✅ ${count} adet süresi dolmuş token temizlendi.`);
+            } else {
+                alert('❌ Token temizleme sırasında hata oluştu.');
+            }
+        });
+    }).catch(error => {
+        console.error('E-posta doğrulama modülü yüklenemedi:', error);
+        alert('Temizlik işlemi başarısız: ' + error.message);
+    });
+}
+
 function setupFormEventListeners() {
     console.log('📋 Form event listener\'ları ekleniyor...');
     
