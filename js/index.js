@@ -3,7 +3,32 @@ let selectedRow = null;
 let selectedColumn = null;
 let colorTargetType = '';
 let isMultiDeleteModeActive = false;
+let authModuleLoaded = false;
 const CHECKBOX_COLUMN_CLASS = 'row-checkbox-cell';
+
+const turkeyLocationData = {
+    'İstanbul': ['Kadıköy', 'Beşiktaş', 'Şişli', 'Bakırköy', 'Üsküdar', 'Fatih', 'Beyoğlu', 'Kartal', 'Maltepe', 'Pendik', 'Ümraniye', 'Zeytinburnu'],
+    'Ankara': ['Çankaya', 'Keçiören', 'Mamak', 'Etimesgut', 'Sincan', 'Altındağ', 'Yenimahalle', 'Gölbaşı', 'Pursaklar'],
+    'İzmir': ['Konak', 'Karşıyaka', 'Bornova', 'Buca', 'Gaziemir', 'Balçova', 'Narlıdere', 'Bayraklı', 'Çiğli'],
+    'Kocaeli': ['İzmit', 'Gebze', 'Darıca', 'Körfez', 'Gölcük', 'Başiskele', 'Çayırova', 'Derince'],
+    'Antalya': ['Muratpaşa', 'Kepez', 'Konyaaltı', 'Aksu', 'Döşemealtı', 'Serik', 'Manavgat', 'Alanya'],
+    'Bursa': ['Osmangazi', 'Nilüfer', 'Yıldırım', 'Gemlik', 'İnegöl', 'Mudanya', 'Orhangazi', 'Mustafakemalpaşa']
+};
+
+async function loadAuthModule() {
+    if (authModuleLoaded) return true;
+    
+    try {
+        const authModule = await import('./auth.js');
+        window.authModule = authModule;
+        authModuleLoaded = true;
+        console.log('✅ Auth modülü yüklendi');
+        return true;
+    } catch (error) {
+        console.error('❌ Auth modülü yüklenemedi:', error);
+        return false;
+    }
+}
 
 function toggleMenu(menuId) {
     const menu = document.getElementById(menuId);
@@ -16,139 +41,150 @@ function toggleMenu(menuId) {
         }
     });
 
-    menu.classList.toggle('show');
+    if (menu) {
+        menu.classList.toggle('show');
+    }
 
     const button = document.querySelector(`[onclick="toggleMenu('${menuId}')"]`);
     allButtons.forEach(b => b.classList.remove('active'));
-    if (menu.classList.contains('show')) {
+    if (button && menu && menu.classList.contains('show')) {
         button.classList.add('active');
     }
 }
 
-document.addEventListener('click', function (event) {
-    if (!event.target.closest('.nav-menu')) {
-        document.querySelectorAll('.dropdown-menu').forEach(menu => {
-            menu.classList.remove('show');
-        });
-        document.querySelectorAll('.nav-button').forEach(button => {
-            button.classList.remove('active');
-        });
-    }
-});
-
 function toggleStatsPanel() {
     const statsPanel = document.getElementById('statsPanel');
-    statsPanel.style.display = statsPanel.style.display === 'none' ? 'grid' : 'none';
+    if (statsPanel) {
+        const isVisible = statsPanel.style.display !== 'none';
+        statsPanel.style.display = isVisible ? 'none' : 'grid';
+    }
 }
 
 async function saveTableAsExcel() {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Tablo Verileri');
-    const table = document.getElementById('dynamicTable');
-
-    const headers = [];
-    const headerStyles = [];
-    table.querySelectorAll('thead th').forEach(th => {
-        if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-        headers.push(th.textContent.trim());
-        headerStyles.push({
-            bg: th.style.backgroundColor || '#2c3e50',
-            text: th.style.color || '#ffffff'
-        });
-    });
-
-    if (headers.length === 0) {
-        alert("Kaydedilecek veri bulunamadı.");
-        return;
-    }
-
-    const headerRow = worksheet.addRow(headers);
-    headerRow.eachCell((cell, colNumber) => {
-        const style = headerStyles[colNumber - 1];
-        cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: colorToARGB(style.bg) }
-        };
-        cell.font = {
-            name: 'Calibri',
-            size: 12,
-            bold: true,
-            color: { argb: colorToARGB(style.text) }
-        };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = {
-            top: { style: 'medium', color: { argb: 'FF000000' } },
-            left: { style: 'medium', color: { argb: 'FF000000' } },
-            bottom: { style: 'medium', color: { argb: 'FF000000' } },
-            right: { style: 'medium', color: { argb: 'FF000000' } }
-        };
-    });
-
-    worksheet.columns = headers.map(() => ({ width: 25 }));
-
-    table.querySelectorAll('tbody tr').forEach(trNode => {
-        const rowData = [];
-        const cellStyles = [];
-        const cellMeta = [];
-
-        Array.from(trNode.cells).forEach((td, idx) => {
-            if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-
-            const input = td.querySelector('.editable');
-            rowData.push(input ? input.value.trim() : td.textContent.trim());
-            cellStyles.push({
-                bg: td.style.backgroundColor || '#ffffff',
-                text: td.style.color || '#000000'
-            });
-            cellMeta.push({
-                readonly: input ? input.readOnly : false
-            });
-        });
-
-        if (rowData.length > 0) {
-            const dataRow = worksheet.addRow(rowData);
-            dataRow.eachCell((cell, colNumber) => {
-                const style = cellStyles[colNumber - 1];
-                const meta = cellMeta[colNumber - 1];
-
-                cell.font = {
-                    name: 'Calibri',
-                    size: 11,
-                    color: { argb: colorToARGB(style.text) }
-                };
-
-                if (style.bg && style.bg !== 'rgb(255, 255, 255)' && style.bg !== '#ffffff' && style.bg !== 'transparent' && style.bg !== '') {
-                    cell.fill = {
-                        type: 'pattern',
-                        pattern: 'solid',
-                        fgColor: { argb: colorToARGB(style.bg) }
-                    };
-                }
-
-                cell.alignment = { vertical: 'middle', wrapText: true };
-                cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-                    left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-                    bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-                    right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
-                };
-
-                if (meta.readonly) {
-                    cell.note = "readonly:true";
-                }
-            });
+    try {
+        if (typeof ExcelJS === 'undefined') {
+            throw new Error('ExcelJS kütüphanesi yüklenmemiş');
         }
-    });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Anadolu_Genclik_Tablo_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Tablo Verileri');
+        const table = document.getElementById('dynamicTable');
+
+        if (!table) {
+            throw new Error('Tablo bulunamadı');
+        }
+
+        const headers = [];
+        const headerStyles = [];
+        
+        table.querySelectorAll('thead th').forEach(th => {
+            if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+            headers.push(th.textContent.trim());
+            headerStyles.push({
+                bg: th.style.backgroundColor || '#2c3e50',
+                text: th.style.color || '#ffffff'
+            });
+        });
+
+        if (headers.length === 0) {
+            alert("Kaydedilecek veri bulunamadı.");
+            return;
+        }
+
+        const headerRow = worksheet.addRow(headers);
+        headerRow.eachCell((cell, colNumber) => {
+            const style = headerStyles[colNumber - 1];
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: colorToARGB(style.bg) }
+            };
+            cell.font = {
+                name: 'Calibri',
+                size: 12,
+                bold: true,
+                color: { argb: colorToARGB(style.text) }
+            };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'medium', color: { argb: 'FF000000' } },
+                left: { style: 'medium', color: { argb: 'FF000000' } },
+                bottom: { style: 'medium', color: { argb: 'FF000000' } },
+                right: { style: 'medium', color: { argb: 'FF000000' } }
+            };
+        });
+
+        worksheet.columns = headers.map(() => ({ width: 25 }));
+
+        table.querySelectorAll('tbody tr').forEach(trNode => {
+            const rowData = [];
+            const cellStyles = [];
+            const cellMeta = [];
+
+            Array.from(trNode.cells).forEach((td, idx) => {
+                if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+
+                const input = td.querySelector('.editable');
+                rowData.push(input ? input.value.trim() : td.textContent.trim());
+                cellStyles.push({
+                    bg: td.style.backgroundColor || '#ffffff',
+                    text: td.style.color || '#000000'
+                });
+                cellMeta.push({
+                    readonly: input ? input.readOnly : false
+                });
+            });
+
+            if (rowData.length > 0) {
+                const dataRow = worksheet.addRow(rowData);
+                dataRow.eachCell((cell, colNumber) => {
+                    const style = cellStyles[colNumber - 1];
+                    const meta = cellMeta[colNumber - 1];
+
+                    cell.font = {
+                        name: 'Calibri',
+                        size: 11,
+                        color: { argb: colorToARGB(style.text) }
+                    };
+
+                    if (style.bg && style.bg !== 'rgb(255, 255, 255)' && style.bg !== '#ffffff' && style.bg !== 'transparent' && style.bg !== '') {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: colorToARGB(style.bg) }
+                        };
+                    }
+
+                    cell.alignment = { vertical: 'middle', wrapText: true };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                        left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                        bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                        right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
+                    };
+
+                    if (meta.readonly) {
+                        cell.note = "readonly:true";
+                    }
+                });
+            }
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Tabledit_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('✅ Excel dosyası başarıyla kaydedildi');
+
+    } catch (error) {
+        console.error('❌ Excel kaydetme hatası:', error);
+        alert('Dosya kaydedilirken bir hata oluştu: ' + error.message);
+    }
 }
 
 function loadTableFromExcel() {
@@ -161,6 +197,10 @@ function loadTableFromExcel() {
             const reader = new FileReader();
             reader.onload = async function (e) {
                 try {
+                    if (typeof ExcelJS === 'undefined') {
+                        throw new Error('ExcelJS kütüphanesi yüklenmemiş');
+                    }
+
                     const data = new Uint8Array(e.target.result);
                     const workbook = new ExcelJS.Workbook();
                     await workbook.xlsx.load(data);
@@ -176,7 +216,10 @@ function loadTableFromExcel() {
                     }
 
                     loadExcelData(worksheet);
+                    console.log('✅ Excel dosyası başarıyla yüklendi');
+
                 } catch (error) {
+                    console.error('❌ Excel yükleme hatası:', error);
                     alert('Dosya yüklenirken hata oluştu: ' + error.message);
                 }
             };
@@ -266,27 +309,38 @@ function loadExcelData(worksheet) {
 
 function argbToHex(argb) {
     if (!argb) return '#ffffff';
-    const hex = argb.substring(2);
-    return '#' + hex.toLowerCase();
+    if (argb.length === 8) {
+        const hex = argb.substring(2);
+        return '#' + hex.toLowerCase();
+    }
+    return argb;
 }
 
 function updateSelectionInfo(message) {
     const selectionInfoEl = document.getElementById('selectionInfo');
     const selectionTextEl = document.getElementById('selectionText');
     if (message) {
-        selectionTextEl.textContent = message;
-        selectionInfoEl.classList.add('show');
+        if (selectionTextEl) selectionTextEl.textContent = message;
+        if (selectionInfoEl) selectionInfoEl.classList.add('show');
     } else {
-        selectionTextEl.textContent = 'Seçim yapılmadı';
-        selectionInfoEl.classList.remove('show');
+        if (selectionTextEl) selectionTextEl.textContent = 'Seçim yapılmadı';
+        if (selectionInfoEl) selectionInfoEl.classList.remove('show');
     }
 }
 
 function printTableOnly() {
     const wasMultiDeleteActive = isMultiDeleteModeActive;
     if (wasMultiDeleteActive) hideRowCheckboxes();
+    
     const printWindow = window.open('', '_blank');
-    const tableHtml = document.querySelector('.table-container').innerHTML;
+    const tableContainer = document.querySelector('.table-container');
+    
+    if (!tableContainer) {
+        alert('Yazdırılacak tablo bulunamadı.');
+        return;
+    }
+    
+    const tableHtml = tableContainer.innerHTML;
 
     printWindow.document.write(`
         <!DOCTYPE html>
@@ -322,7 +376,8 @@ function printTableOnly() {
             </style>
         </head>
         <body>
-            <h2>Tablo Raporu</h2>
+            <h2>Tabledit - Tablo Raporu</h2>
+            <p>Yazdırma Tarihi: ${new Date().toLocaleString('tr-TR')}</p>
             <div>${tableHtml}</div>
         </body>
         </html>
@@ -337,8 +392,9 @@ function selectCell(cell, event) {
     if (event) {
         event.stopPropagation();
     }
+    
     if (isMultiDeleteModeActive) {
-        if (cell.parentNode.tagName === 'TR') {
+        if (cell.parentNode && cell.parentNode.tagName === 'TR') {
             selectRow(cell.parentNode);
         }
         return;
@@ -365,7 +421,9 @@ function selectCell(cell, event) {
     dataCellIndex = visualCellIndex - counter;
 
     const headerText = headerCells[visualCellIndex]?.textContent || (dataCellIndex + 1);
-    updateSelectionInfo(`Hücre seçildi: Satır ${cell.parentNode.parentNode.tagName === 'TBODY' ? Array.from(cell.parentNode.parentNode.children).indexOf(cell.parentNode) + 1 : 'Başlık'}, Sütun "${headerText}"`);
+    const rowNumber = cell.parentNode.parentNode.tagName === 'TBODY' ? Array.from(cell.parentNode.parentNode.children).indexOf(cell.parentNode) + 1 : 'Başlık';
+    
+    updateSelectionInfo(`Hücre seçildi: Satır ${rowNumber}, Sütun "${headerText}"`);
 
     if (event && (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA')) {
         return;
@@ -383,6 +441,7 @@ function selectRow(row) {
         }
         return;
     }
+    
     clearSelection(false);
     selectedRow = row;
     row.classList.add('selected-row');
@@ -394,6 +453,7 @@ function selectColumn(headerCell, event, visualIndex) {
     if (isMultiDeleteModeActive || (headerCell && headerCell.classList.contains(CHECKBOX_COLUMN_CLASS))) {
         return;
     }
+    
     clearSelection(false);
 
     if (event && event.shiftKey) {
@@ -422,19 +482,20 @@ function selectColumn(headerCell, event, visualIndex) {
 function showColorPalette(target) {
     colorTargetType = target;
     const palette = document.getElementById('colorPalette');
-    palette.classList.add('show');
+    if (palette) {
+        palette.classList.add('show');
+        palette.style.top = '20px';
+        palette.style.left = '20px';
 
-    palette.style.top = '20px';
-    palette.style.left = '20px';
-
-    setTimeout(() => {
-        document.addEventListener('click', hidePaletteOnClickOutside, { once: true });
-    }, 0);
+        setTimeout(() => {
+            document.addEventListener('click', hidePaletteOnClickOutside, { once: true });
+        }, 0);
+    }
 }
 
 function hidePaletteOnClickOutside(event) {
     const palette = document.getElementById('colorPalette');
-    if (!palette.contains(event.target) && !event.target.closest('[onclick^="showColorPalette"]')) {
+    if (palette && !palette.contains(event.target) && !event.target.closest('[onclick^="showColorPalette"]')) {
         palette.classList.remove('show');
     } else {
         document.addEventListener('click', hidePaletteOnClickOutside, { once: true });
@@ -480,7 +541,10 @@ function applyColor(color) {
     } else {
         alert('Lütfen önce bir hücre, satır veya sütun seçin.');
     }
-    palette.classList.remove('show');
+    
+    if (palette) {
+        palette.classList.remove('show');
+    }
 }
 
 function clearCellFormat() {
@@ -563,8 +627,9 @@ function addRow() {
     const headerCells = Array.from(headerRow.cells);
     let dataColumnCount = headerCells.filter(th => !th.classList.contains(CHECKBOX_COLUMN_CLASS)).length;
 
-    if (dataColumnCount === 0 && headerCells.length > 0) dataColumnCount = 1;
-    else if (dataColumnCount === 0 && headerCells.length === 0) {
+    if (dataColumnCount === 0 && headerCells.length > 0) {
+        dataColumnCount = 1;
+    } else if (dataColumnCount === 0 && headerCells.length === 0) {
         const idTh = document.createElement('th');
         idTh.textContent = 'ID';
         idTh.style.background = '#2c3e50';
@@ -588,7 +653,6 @@ function addRow() {
     }
 
     const currentRowCount = tbody.rows.length;
-    const newId = currentRowCount;
 
     for (let i = 0; i < dataColumnCount; i++) {
         const cell = newRow.insertCell();
@@ -596,7 +660,7 @@ function addRow() {
         cell.style.cursor = 'pointer';
 
         if (i === 0) {
-            cell.innerHTML = `<input type="text" class="editable" value="${newId}" readonly>`;
+            cell.innerHTML = `<input type="text" class="editable" value="${currentRowCount}" readonly>`;
         } else {
             cell.innerHTML = `<input type="text" class="editable" value="">`;
         }
@@ -608,15 +672,22 @@ function addRow() {
 }
 
 function addColumn() {
-    document.getElementById('columnModal').style.display = 'block';
+    const modal = document.getElementById('columnModal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
 }
 
 function confirmAddColumn() {
-    const columnName = document.getElementById('columnName').value || 'Yeni Sütun';
-    const position = document.getElementById('columnPosition').value;
+    const columnNameInput = document.getElementById('columnName');
+    const columnPositionSelect = document.getElementById('columnPosition');
+    
+    const columnName = columnNameInput ? columnNameInput.value || 'Yeni Sütun' : 'Yeni Sütun';
+    const position = columnPositionSelect ? columnPositionSelect.value : 'end';
+    
     const table = document.getElementById('dynamicTable');
-
     const headerRow = table.querySelector('thead tr');
+
     if (!headerRow) {
         const newHeaderRow = table.querySelector('thead').insertRow();
         const newHeader = document.createElement('th');
@@ -641,6 +712,7 @@ function confirmAddColumn() {
 
         const bodyRows = table.querySelectorAll('tbody tr');
         let insertAtIndex;
+        
         if (position === 'start') {
             insertAtIndex = headerRow.cells[0]?.classList.contains(CHECKBOX_COLUMN_CLASS) ? 1 : 0;
         } else {
@@ -678,6 +750,7 @@ function deleteSelectedColumn() {
         alert('Lütfen silmek istediğiniz sütunu seçin.');
         return;
     }
+    
     const table = document.getElementById('dynamicTable');
     const headerCellToDelete = table.querySelector('thead tr').cells[selectedColumn];
 
@@ -784,6 +857,8 @@ function updateColumnClickEvents() {
 function updateRowNumbers() {
     const table = document.getElementById('dynamicTable');
     const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    
     const rows = Array.from(tbody.querySelectorAll('tr'));
 
     rows.forEach((row, index) => {
@@ -809,6 +884,7 @@ function updateStats() {
     const rowCount = table.querySelectorAll('tbody tr').length;
     const headerRow = table.querySelector('thead tr');
     let columnCount = 0;
+    
     if (headerRow) {
         Array.from(headerRow.cells).forEach(th => {
             if (!th.classList.contains(CHECKBOX_COLUMN_CLASS)) {
@@ -816,33 +892,37 @@ function updateStats() {
             }
         });
     }
+    
     const cellCount = rowCount * columnCount;
 
-    document.getElementById('rowCount').textContent = rowCount;
-    document.getElementById('columnCount').textContent = columnCount;
-    document.getElementById('cellCount').textContent = cellCount;
+    const rowCountEl = document.getElementById('rowCount');
+    const columnCountEl = document.getElementById('columnCount');
+    const cellCountEl = document.getElementById('cellCount');
+    
+    if (rowCountEl) rowCountEl.textContent = rowCount;
+    if (columnCountEl) columnCountEl.textContent = columnCount;
+    if (cellCountEl) cellCountEl.textContent = cellCount;
 }
 
 function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    
     const columnNameInput = document.getElementById('columnName');
-    if (columnNameInput) columnNameInput.value = '';
-}
-
-window.onclick = function (event) {
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-        }
-    });
+    if (columnNameInput) {
+        columnNameInput.value = '';
+    }
 }
 
 function clearTable() {
     if (confirm('Tüm tabloyu temizlemek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
         const table = document.getElementById('dynamicTable');
         const tbody = table.querySelector('tbody');
-        tbody.innerHTML = '';
+        if (tbody) {
+            tbody.innerHTML = '';
+        }
 
         const theadTr = table.querySelector('thead tr');
         if (theadTr) {
@@ -869,110 +949,177 @@ function exportToExcelBasic() {
     const wasMultiDeleteActive = isMultiDeleteModeActive;
     if (wasMultiDeleteActive) hideRowCheckboxes();
 
-    const table = document.getElementById('dynamicTable');
-    const wb = XLSX.utils.book_new();
-    const data = [];
+    try {
+        if (typeof XLSX === 'undefined') {
+            throw new Error('XLSX kütüphanesi yüklenmemiş');
+        }
 
-    const headers = [];
-    table.querySelectorAll('thead th').forEach(th => {
-        if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-        headers.push(th.textContent.trim());
-    });
-    data.push(headers);
+        const table = document.getElementById('dynamicTable');
+        const wb = XLSX.utils.book_new();
+        const data = [];
 
-    table.querySelectorAll('tbody tr').forEach(row => {
-        const rowData = [];
-        Array.from(row.cells).forEach(td => {
-            if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-            const input = td.querySelector('.editable');
-            rowData.push(input ? input.value.trim() : td.textContent.trim());
+        const headers = [];
+        table.querySelectorAll('thead th').forEach(th => {
+            if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+            headers.push(th.textContent.trim());
         });
-        if (rowData.length > 0) data.push(rowData);
-    });
+        
+        if (headers.length > 0) {
+            data.push(headers);
+        }
 
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    if (headers.length > 0) {
-        ws['!cols'] = headers.map(() => ({ wch: 20 }));
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const rowData = [];
+            Array.from(row.cells).forEach(td => {
+                if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+                const input = td.querySelector('.editable');
+                rowData.push(input ? input.value.trim() : td.textContent.trim());
+            });
+            if (rowData.length > 0) data.push(rowData);
+        });
+
+        if (data.length === 0) {
+            alert("Dışa aktarılacak veri bulunamadı.");
+            return;
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        if (headers.length > 0) {
+            ws['!cols'] = headers.map(() => ({ wch: 20 }));
+        }
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Tabledit");
+        XLSX.writeFile(wb, `Tabledit_Basit_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+        console.log('✅ Basit Excel dosyası başarıyla dışa aktarıldı');
+
+    } catch (error) {
+        console.error('❌ Basit Excel dışa aktarma hatası:', error);
+        alert('Dosya dışa aktarılırken hata oluştu: ' + error.message);
+    } finally {
+        if (wasMultiDeleteActive) showRowCheckboxes();
     }
-    XLSX.utils.book_append_sheet(wb, ws, "Anadolu Gençlik Tablosu");
-    XLSX.writeFile(wb, `Anadolu_Genclik_Basit_${new Date().toISOString().slice(0, 10)}.xlsx`);
-
-    if (wasMultiDeleteActive) showRowCheckboxes();
 }
 
 async function exportToExcelAdvanced() {
     const wasMultiDeleteActive = isMultiDeleteModeActive;
     if (wasMultiDeleteActive) hideRowCheckboxes();
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Anadolu Gençlik Tablosu');
-    const table = document.getElementById('dynamicTable');
+    try {
+        if (typeof ExcelJS === 'undefined') {
+            throw new Error('ExcelJS kütüphanesi yüklenmemiş');
+        }
 
-    const headers = [];
-    const headerStyles = [];
-    table.querySelectorAll('thead th').forEach(th => {
-        if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-        headers.push(th.textContent.trim());
-        headerStyles.push({ bg: th.style.backgroundColor || '#2c3e50', text: th.style.color || '#ffffff' });
-    });
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Tabledit');
+        const table = document.getElementById('dynamicTable');
 
-    if (headers.length === 0) {
-        alert("Dışa aktarılacak veri bulunamadı.");
-        if (wasMultiDeleteActive) showRowCheckboxes();
-        return;
-    }
-
-    const headerRow = worksheet.addRow(headers);
-    headerRow.eachCell((cell, colNumber) => {
-        const style = headerStyles[colNumber - 1];
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorToARGB(style.bg) } };
-        cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: colorToARGB(style.text) } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = {
-            top: { style: 'medium', color: { argb: 'FF000000' } }, left: { style: 'medium', color: { argb: 'FF000000' } },
-            bottom: { style: 'medium', color: { argb: 'FF000000' } }, right: { style: 'medium', color: { argb: 'FF000000' } }
-        };
-    });
-    worksheet.columns = headers.map(() => ({ width: 25 }));
-
-    table.querySelectorAll('tbody tr').forEach(trNode => {
-        const rowData = [];
-        const cellStyles = [];
-        Array.from(trNode.cells).forEach(td => {
-            if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-            const input = td.querySelector('.editable');
-            rowData.push(input ? input.value.trim() : td.textContent.trim());
-            cellStyles.push({ bg: td.style.backgroundColor || '#ffffff', text: td.style.color || '#000000' });
+        const headers = [];
+        const headerStyles = [];
+        
+        table.querySelectorAll('thead th').forEach(th => {
+            if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+            headers.push(th.textContent.trim());
+            headerStyles.push({ 
+                bg: th.style.backgroundColor || '#2c3e50', 
+                text: th.style.color || '#ffffff' 
+            });
         });
 
-        if (rowData.length > 0) {
-            const dataRow = worksheet.addRow(rowData);
-            dataRow.eachCell((cell, colNumber) => {
-                const style = cellStyles[colNumber - 1];
-                cell.font = { name: 'Calibri', size: 11, color: { argb: colorToARGB(style.text) } };
-                if (style.bg && style.bg !== 'rgb(255, 255, 255)' && style.bg !== '#ffffff' && style.bg !== 'transparent' && style.bg !== '') {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorToARGB(style.bg) } };
-                }
-                cell.alignment = { vertical: 'middle', wrapText: true };
-                cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFBFBFBF' } }, left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-                    bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } }, right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
-                };
-            });
+        if (headers.length === 0) {
+            alert("Dışa aktarılacak veri bulunamadı.");
+            return;
         }
-    });
-    if (worksheet.getRow(1)) worksheet.getRow(1).height = 30;
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Anadolu_Genclik_Renkli_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        const headerRow = worksheet.addRow(headers);
+        headerRow.eachCell((cell, colNumber) => {
+            const style = headerStyles[colNumber - 1];
+            cell.fill = { 
+                type: 'pattern', 
+                pattern: 'solid', 
+                fgColor: { argb: colorToARGB(style.bg) } 
+            };
+            cell.font = { 
+                name: 'Calibri', 
+                size: 12, 
+                bold: true, 
+                color: { argb: colorToARGB(style.text) } 
+            };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'medium', color: { argb: 'FF000000' } }, 
+                left: { style: 'medium', color: { argb: 'FF000000' } },
+                bottom: { style: 'medium', color: { argb: 'FF000000' } }, 
+                right: { style: 'medium', color: { argb: 'FF000000' } }
+            };
+        });
+        
+        worksheet.columns = headers.map(() => ({ width: 25 }));
 
-    if (wasMultiDeleteActive) showRowCheckboxes();
+        table.querySelectorAll('tbody tr').forEach(trNode => {
+            const rowData = [];
+            const cellStyles = [];
+            
+            Array.from(trNode.cells).forEach(td => {
+                if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+                const input = td.querySelector('.editable');
+                rowData.push(input ? input.value.trim() : td.textContent.trim());
+                cellStyles.push({ 
+                    bg: td.style.backgroundColor || '#ffffff', 
+                    text: td.style.color || '#000000' 
+                });
+            });
+
+            if (rowData.length > 0) {
+                const dataRow = worksheet.addRow(rowData);
+                dataRow.eachCell((cell, colNumber) => {
+                    const style = cellStyles[colNumber - 1];
+                    cell.font = { 
+                        name: 'Calibri', 
+                        size: 11, 
+                        color: { argb: colorToARGB(style.text) } 
+                    };
+                    
+                    if (style.bg && style.bg !== 'rgb(255, 255, 255)' && style.bg !== '#ffffff' && style.bg !== 'transparent' && style.bg !== '') {
+                        cell.fill = { 
+                            type: 'pattern', 
+                            pattern: 'solid', 
+                            fgColor: { argb: colorToARGB(style.bg) } 
+                        };
+                    }
+                    
+                    cell.alignment = { vertical: 'middle', wrapText: true };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFBFBFBF' } }, 
+                        left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                        bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } }, 
+                        right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
+                    };
+                });
+            }
+        });
+        
+        if (worksheet.getRow(1)) {
+            worksheet.getRow(1).height = 30;
+        }
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Tabledit_Formatlı_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log('✅ Formatlı Excel dosyası başarıyla dışa aktarıldı');
+
+    } catch (error) {
+        console.error('❌ Formatlı Excel dışa aktarma hatası:', error);
+        alert('Dosya dışa aktarılırken hata oluştu: ' + error.message);
+    } finally {
+        if (wasMultiDeleteActive) showRowCheckboxes();
+    }
 }
 
 function colorToARGB(color) {
@@ -999,11 +1146,20 @@ function colorToARGB(color) {
             b = parseInt(hex.substring(4, 6), 16);
         }
     } else {
-        const namedColorMap = { 'white': 'FFFFFFFF', 'black': 'FF000000' };
-        if (namedColorMap[color.toLowerCase()]) return namedColorMap[color.toLowerCase()];
+        const namedColorMap = { 
+            'white': 'FFFFFFFF', 
+            'black': 'FF000000',
+            'red': 'FFFF0000',
+            'green': 'FF00FF00',
+            'blue': 'FF0000FF'
+        };
+        if (namedColorMap[color.toLowerCase()]) {
+            return namedColorMap[color.toLowerCase()];
+        }
         console.warn("Bilinmeyen renk adı:", color, "Beyaz varsayılıyor.");
         return 'FFFFFFFF';
     }
+    
     return `FF${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
 }
 
@@ -1011,44 +1167,52 @@ function exportToCSV() {
     const wasMultiDeleteActive = isMultiDeleteModeActive;
     if (wasMultiDeleteActive) hideRowCheckboxes();
 
-    const table = document.getElementById('dynamicTable');
-    let csv = '';
+    try {
+        const table = document.getElementById('dynamicTable');
+        let csv = '';
 
-    const headers = [];
-    table.querySelectorAll('thead th').forEach(th => {
-        if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-        headers.push(`"${th.textContent.trim().replace(/"/g, '""')}"`);
-    });
-
-    if (headers.length === 0) {
-        alert("Dışa aktarılacak veri bulunamadı.");
-        if (wasMultiDeleteActive) showRowCheckboxes();
-        return;
-    }
-    csv += headers.join(',') + '\n';
-
-    table.querySelectorAll('tbody tr').forEach(row => {
-        const rowData = [];
-        Array.from(row.cells).forEach(td => {
-            if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
-            const input = td.querySelector('.editable');
-            const text = input ? input.value.trim() : td.textContent.trim();
-            rowData.push(`"${text.replace(/"/g, '""')}"`);
+        const headers = [];
+        table.querySelectorAll('thead th').forEach(th => {
+            if (th.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+            headers.push(`"${th.textContent.trim().replace(/"/g, '""')}"`);
         });
-        if (rowData.length > 0) {
-            csv += rowData.join(',') + '\n';
+
+        if (headers.length === 0) {
+            alert("Dışa aktarılacak veri bulunamadı.");
+            return;
         }
-    });
+        
+        csv += headers.join(',') + '\n';
 
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Anadolu_Genclik_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const rowData = [];
+            Array.from(row.cells).forEach(td => {
+                if (td.classList.contains(CHECKBOX_COLUMN_CLASS)) return;
+                const input = td.querySelector('.editable');
+                const text = input ? input.value.trim() : td.textContent.trim();
+                rowData.push(`"${text.replace(/"/g, '""')}"`);
+            });
+            if (rowData.length > 0) {
+                csv += rowData.join(',') + '\n';
+            }
+        });
 
-    if (wasMultiDeleteActive) showRowCheckboxes();
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Tabledit_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log('✅ CSV dosyası başarıyla dışa aktarıldı');
+
+    } catch (error) {
+        console.error('❌ CSV dışa aktarma hatası:', error);
+        alert('Dosya dışa aktarılırken hata oluştu: ' + error.message);
+    } finally {
+        if (wasMultiDeleteActive) showRowCheckboxes();
+    }
 }
 
 function toggleMultiDeleteMode() {
@@ -1057,12 +1221,16 @@ function toggleMultiDeleteMode() {
 
     if (isMultiDeleteModeActive) {
         showRowCheckboxes();
-        multiDeleteToolbar.style.display = 'flex';
+        if (multiDeleteToolbar) {
+            multiDeleteToolbar.style.display = 'flex';
+        }
         clearSelection(false);
         updateSelectionInfo('Çoklu satır silme modu aktif. Satırları seçip onaylayın.');
     } else {
         hideRowCheckboxes();
-        multiDeleteToolbar.style.display = 'none';
+        if (multiDeleteToolbar) {
+            multiDeleteToolbar.style.display = 'none';
+        }
         updateSelectionInfo(null);
     }
     updateColumnClickEvents();
@@ -1082,20 +1250,22 @@ function showRowCheckboxes() {
         theadTr.insertBefore(th, theadTr.firstChild);
     }
 
-    tbody.querySelectorAll('tr').forEach(row => {
-        if (!row.querySelector(`td.${CHECKBOX_COLUMN_CLASS}`)) {
-            const cell = row.insertCell(0);
-            cell.classList.add(CHECKBOX_COLUMN_CLASS);
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.style.cursor = 'pointer';
-            checkbox.onclick = function (event) { event.stopPropagation(); };
-            cell.appendChild(checkbox);
-            cell.style.textAlign = 'center';
-            cell.style.verticalAlign = 'middle';
-            cell.onclick = function (event) { event.stopPropagation(); checkbox.click(); };
-        }
-    });
+    if (tbody) {
+        tbody.querySelectorAll('tr').forEach(row => {
+            if (!row.querySelector(`td.${CHECKBOX_COLUMN_CLASS}`)) {
+                const cell = row.insertCell(0);
+                cell.classList.add(CHECKBOX_COLUMN_CLASS);
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.style.cursor = 'pointer';
+                checkbox.onclick = function (event) { event.stopPropagation(); };
+                cell.appendChild(checkbox);
+                cell.style.textAlign = 'center';
+                cell.style.verticalAlign = 'middle';
+                cell.onclick = function (event) { event.stopPropagation(); checkbox.click(); };
+            }
+        });
+    }
     updateStats();
 }
 
@@ -1107,6 +1277,8 @@ function hideRowCheckboxes() {
 
 function confirmDeleteSelectedRows() {
     const tbody = document.getElementById('dynamicTable').querySelector('tbody');
+    if (!tbody) return;
+    
     const rowsToDelete = [];
     tbody.querySelectorAll('tr').forEach(row => {
         const checkboxCell = row.cells[0];
@@ -1131,60 +1303,36 @@ function confirmDeleteSelectedRows() {
     }
 }
 
-document.addEventListener('keydown', function (event) {
-    if (event.ctrlKey || event.metaKey) {
-        switch (event.key) {
-            case 's':
-            case 'S':
-                event.preventDefault();
-                saveTableAsExcel();
-                break;
-            case 'o':
-            case 'O':
-                event.preventDefault();
-                loadTableFromExcel();
-                break;
-            case 'p':
-            case 'P':
-                event.preventDefault();
-                printTableOnly();
-                break;
-        }
-    }
-});
-
-window.openAuthModal = function (type) {
-    import('./auth.js').then(module => {
-        module.openAuthModal(type);
-    }).catch(error => {
-        console.error('Auth module load error:', error);
+window.openAuthModal = async function (type) {
+    const authLoaded = await loadAuthModule();
+    if (authLoaded && window.authModule) {
+        window.authModule.openAuthModal(type);
+    } else {
         alert('Giriş sistemi yüklenirken hata oluştu. Sayfayı yenileyin.');
-    });
+    }
 }
 
-window.closeAuthModal = function (type) {
-    import('./auth.js').then(module => {
-        module.closeAuthModal(type);
-    }).catch(error => {
-        console.error('Auth module load error:', error);
-    });
+window.closeAuthModal = async function (type) {
+    const authLoaded = await loadAuthModule();
+    if (authLoaded && window.authModule) {
+        window.authModule.closeAuthModal(type);
+    }
 }
 
-window.toggleUserDropdown = function () {
-    import('./auth.js').then(module => {
-        module.toggleUserDropdown();
-    }).catch(error => {
-        console.error('Auth module load error:', error);
-    });
+window.toggleUserDropdown = async function () {
+    const authLoaded = await loadAuthModule();
+    if (authLoaded && window.authModule) {
+        window.authModule.toggleUserDropdown();
+    }
 }
 
-window.logoutUser = function () {
-    import('./auth.js').then(module => {
-        module.logoutUser();
-    }).catch(error => {
-        console.error('Auth module load error:', error);
+window.logoutUser = async function () {
+    const authLoaded = await loadAuthModule();
+    if (authLoaded && window.authModule) {
+        window.authModule.logoutUser();
+    } else {
         alert('Çıkış sistemi yüklenirken hata oluştu. Sayfayı yenileyin.');
-    });
+    }
 }
 
 window.openProfile = function () {
@@ -1199,53 +1347,51 @@ window.createNewFile = function () {
     alert('Yeni dosya özelliği yakında gelecek!');
 }
 
-window.resendVerificationEmail = function() {
-    import('./auth.js').then(module => {
-        module.resendEmailVerification();
-    }).catch(error => {
-        console.error('Auth module load error:', error);
+window.resendVerificationEmail = async function() {
+    const authLoaded = await loadAuthModule();
+    if (authLoaded && window.authModule) {
+        window.authModule.resendEmailVerification();
+    } else {
         alert('E-posta gönderilirken hata oluştu. Sayfayı yenileyin.');
-    });
+    }
 }
 
-window.checkEmailVerificationStatus = function() {
-    import('./auth.js').then(module => {
-        module.checkEmailVerification();
-    }).catch(error => {
-        console.error('Auth module load error:', error);
+window.checkEmailVerificationStatus = async function() {
+    const authLoaded = await loadAuthModule();
+    if (authLoaded && window.authModule) {
+        window.authModule.checkEmailVerification();
+    } else {
         alert('Kontrol edilirken hata oluştu. Sayfayı yenileyin.');
-    });
+    }
 }
 
-window.closeEmailVerificationModal = function() {
-    import('./auth.js').then(module => {
-        module.closeEmailVerificationModal();
-    }).catch(error => {
-        console.error('Auth module load error:', error);
-    });
+window.closeEmailVerificationModal = async function() {
+    const authLoaded = await loadAuthModule();
+    if (authLoaded && window.authModule) {
+        window.authModule.closeEmailVerificationModal();
+    }
 }
 
 function setupFormEventListeners() {
-    const turkeyData = {
-        'İstanbul': ['Kadıköy', 'Beşiktaş', 'Şişli', 'Bakırköy', 'Üsküdar', 'Fatih', 'Beyoğlu', 'Kartal', 'Maltepe'],
-        'Ankara': ['Çankaya', 'Keçiören', 'Mamak', 'Etimesgut', 'Sincan', 'Altındağ', 'Yenimahalle'],
-        'İzmir': ['Konak', 'Karşıyaka', 'Bornova', 'Buca', 'Gaziemir', 'Balçova', 'Narlıdere'],
-        'Kocaeli': ['İzmit', 'Gebze', 'Darıca', 'Körfez', 'Gölcük', 'Başiskele', 'Çayırova'],
-        'Antalya': ['Muratpaşa', 'Kepez', 'Konyaaltı', 'Aksu', 'Döşemealtı', 'Serik'],
-        'Bursa': ['Osmangazi', 'Nilüfer', 'Yıldırım', 'Gemlik', 'İnegöl', 'Mudanya']
-    };
-    
     function setupCityDistrictDropdowns() {
         const citySelect = document.getElementById('registerCity');
         const districtSelect = document.getElementById('registerDistrict');
         
         if (citySelect && districtSelect) {
+            citySelect.innerHTML = '<option value="">İl Seçin</option>';
+            Object.keys(turkeyLocationData).sort().forEach(city => {
+                const option = document.createElement('option');
+                option.value = city;
+                option.textContent = city;
+                citySelect.appendChild(option);
+            });
+            
             citySelect.addEventListener('change', function() {
                 const selectedCity = this.value;
                 districtSelect.innerHTML = '<option value="">İlçe Seçin</option>';
                 
-                if (selectedCity && turkeyData[selectedCity]) {
-                    turkeyData[selectedCity].forEach(district => {
+                if (selectedCity && turkeyLocationData[selectedCity]) {
+                    turkeyLocationData[selectedCity].forEach(district => {
                         const option = document.createElement('option');
                         option.value = district;
                         option.textContent = district;
@@ -1258,15 +1404,21 @@ function setupFormEventListeners() {
     
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
-        registerForm.addEventListener('submit', function(event) {
+        registerForm.addEventListener('submit', async function(event) {
             event.preventDefault();
             
+            const nameInput = document.getElementById('registerName');
+            const cityInput = document.getElementById('registerCity');
+            const districtInput = document.getElementById('registerDistrict');
+            const emailInput = document.getElementById('registerEmail');
+            const passwordInput = document.getElementById('registerPassword');
+            
             const formData = {
-                name: document.getElementById('registerName').value.trim(),
-                city: document.getElementById('registerCity').value,
-                district: document.getElementById('registerDistrict').value,
-                email: document.getElementById('registerEmail').value.trim(),
-                password: document.getElementById('registerPassword').value
+                name: nameInput ? nameInput.value.trim() : '',
+                city: cityInput ? cityInput.value : '',
+                district: districtInput ? districtInput.value : '',
+                email: emailInput ? emailInput.value.trim() : '',
+                password: passwordInput ? passwordInput.value : ''
             };
             
             if (!formData.name || !formData.email || !formData.password) {
@@ -1279,60 +1431,142 @@ function setupFormEventListeners() {
                 formData.district = formData.district || 'Kadıköy';
             }
             
-            import('./auth.js').then(module => {
-                module.registerUser(formData);
-            }).catch(error => {
-                console.error('Auth module import error:', error);
-                alert('Sistem hatası: Auth modülü yüklenemedi - ' + error.message);
-            });
+            const authLoaded = await loadAuthModule();
+            if (authLoaded && window.authModule) {
+                try {
+                    await window.authModule.registerUser(formData);
+                } catch (error) {
+                    console.error('Kayıt hatası:', error);
+                }
+            } else {
+                alert('Sistem hatası: Auth modülü yüklenemedi');
+            }
         });
     }
     
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
-        loginForm.addEventListener('submit', function(event) {
+        loginForm.addEventListener('submit', async function(event) {
             event.preventDefault();
             
-            const email = document.getElementById('loginEmail').value.trim();
-            const password = document.getElementById('loginPassword').value;
+            const emailInput = document.getElementById('loginEmail');
+            const passwordInput = document.getElementById('loginPassword');
+            
+            const email = emailInput ? emailInput.value.trim() : '';
+            const password = passwordInput ? passwordInput.value : '';
             
             if (!email || !password) {
                 alert('Lütfen e-posta ve şifrenizi girin.');
                 return;
             }
             
-            import('./auth.js').then(module => {
-                module.loginUser(email, password);
-            }).catch(error => {
-                console.error('Auth module import error:', error);
+            const authLoaded = await loadAuthModule();
+            if (authLoaded && window.authModule) {
+                try {
+                    await window.authModule.loginUser(email, password);
+                } catch (error) {
+                    console.error('Giriş hatası:', error);
+                }
+            } else {
                 alert('Sistem hatası: Auth modülü yüklenemedi');
-            });
+            }
         });
     }
     
     setupCityDistrictDropdowns();
 }
 
-const originalOnload = window.onload;
-window.onload = function () {
-    if (originalOnload) {
-        originalOnload();
-    }
-
-    updateStats();
-    updateColumnClickEvents();
-    updateRowNumbers();
-
-    import('./auth.js').then(module => {
-        module.initializeAuth();
-    }).catch(error => {
-        console.error('Auth module import error:', error);
-
-        const authButtons = document.querySelector('.auth-buttons');
-        if (authButtons) {
-            authButtons.innerHTML = '<span style="color: red; font-size: 12px;">Auth sistemi yüklenemedi</span>';
+function initializeEventListeners() {
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('.nav-menu')) {
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                menu.classList.remove('show');
+            });
+            document.querySelectorAll('.nav-button').forEach(button => {
+                button.classList.remove('active');
+            });
         }
     });
 
-    setupFormEventListeners();
+    window.onclick = function (event) {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.ctrlKey || event.metaKey) {
+            switch (event.key) {
+                case 's':
+                case 'S':
+                    event.preventDefault();
+                    saveTableAsExcel();
+                    break;
+                case 'o':
+                case 'O':
+                    event.preventDefault();
+                    loadTableFromExcel();
+                    break;
+                case 'p':
+                case 'P':
+                    event.preventDefault();
+                    printTableOnly();
+                    break;
+            }
+        }
+    });
 }
+
+function initializeApplication() {
+    console.log('🚀 Tabledit uygulaması başlatılıyor...');
+    
+    try {
+        updateStats();
+        updateColumnClickEvents();
+        updateRowNumbers();
+        initializeEventListeners();
+        setupFormEventListeners();
+        
+        loadAuthModule().then(authLoaded => {
+            if (authLoaded && window.authModule) {
+                window.authModule.initializeAuth();
+                console.log('✅ Auth sistemi başlatıldı');
+            } else {
+                console.error('❌ Auth sistemi yüklenemedi');
+                const authButtons = document.querySelector('.auth-buttons');
+                if (authButtons) {
+                    authButtons.innerHTML = '<span style="color: red; font-size: 12px;">Auth sistemi yüklenemedi</span>';
+                }
+            }
+        });
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const verifiedStatus = urlParams.get('verified');
+        
+        if (verifiedStatus === 'success') {
+            setTimeout(() => {
+                alert('🎉 E-posta doğrulama başarılı! Hoş geldiniz!\n\nArtık Tabledit\'in tüm özelliklerini kullanabilirsiniz.');
+                const newUrl = window.location.href.split('?')[0];
+                window.history.replaceState({}, document.title, newUrl);
+            }, 1000);
+        }
+        
+        console.log('✅ Tabledit uygulaması başarıyla başlatıldı');
+        
+    } catch (error) {
+        console.error('❌ Uygulama başlatma hatası:', error);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApplication);
+} else {
+    initializeApplication();
+}
+
+window.addEventListener('load', () => {
+    console.log('📄 Sayfa tamamen yüklendi');
+});

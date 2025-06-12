@@ -1,8 +1,6 @@
-// Firebase Configuration
-
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getAuth, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getFirestore, connectFirestoreEmulator } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC2hj4HDIvzbPXyCkeIhCMBdMsfg7BpK7Q",
@@ -38,8 +36,6 @@ const securityConfig = {
     DELETE_FILE: 5
   }
 };
-
-export { auth, db, securityConfig };
 
 let isOnline = navigator.onLine;
 let connectionStatus = 'checking';
@@ -84,32 +80,44 @@ export const getConnectionStatus = () => ({
   firebase: connectionStatus
 });
 
+const errorMessageMap = {
+  'auth/network-request-failed': 'İnternet bağlantınızı kontrol edin',
+  'auth/too-many-requests': 'Çok fazla deneme. Lütfen biraz bekleyin',
+  'firestore/unavailable': 'Veritabanı geçici olarak kullanılamıyor',
+  'firestore/permission-denied': 'Bu işlem için yetkiniz yok',
+  'auth/email-already-in-use': 'Bu e-posta adresi zaten kullanımda',
+  'auth/weak-password': 'Şifre çok zayıf',
+  'auth/invalid-email': 'Geçersiz e-posta adresi',
+  'auth/user-not-found': 'Kullanıcı bulunamadı',
+  'auth/wrong-password': 'Hatalı şifre'
+};
+
 window.addEventListener('unhandledrejection', event => {
   if (event.reason?.code?.startsWith('auth/') || 
       event.reason?.code?.startsWith('firestore/')) {
+    
+    const errorCode = event.reason.code;
+    const userMessage = errorMessageMap[errorCode];
+    
     console.error('🔥 Firebase Error:', {
-      code: event.reason.code,
+      code: errorCode,
       message: event.reason.message,
+      userMessage: userMessage,
       timestamp: new Date().toISOString()
     });
     
-    const errorMessage = getErrorMessage(event.reason.code);
-    if (errorMessage) {
-      console.log('📢 Kullanıcı hata mesajı:', errorMessage);
+    if (userMessage && !event.reason.handled) {
+      console.log('📢 Kullanıcı hata mesajı:', userMessage);
+      event.reason.handled = true;
     }
   }
 });
 
-function getErrorMessage(errorCode) {
-  const errorMessages = {
-    'auth/network-request-failed': 'İnternet bağlantınızı kontrol edin',
-    'auth/too-many-requests': 'Çok fazla deneme. Lütfen biraz bekleyin',
-    'firestore/unavailable': 'Veritabanı geçici olarak kullanılamıyor',
-    'firestore/permission-denied': 'Bu işlem için yetkiniz yok'
-  };
-  
-  return errorMessages[errorCode] || null;
-}
+auth.onAuthStateChanged((user) => {
+  if (user && !user.emailVerified) {
+    console.log('⚠️ E-posta doğrulanmamış kullanıcı:', user.email);
+  }
+});
 
 checkFirebaseConnection();
 
@@ -118,3 +126,5 @@ console.log('📊 Proje bilgileri:');
 console.log('  📧 Auth Domain:', firebaseConfig.authDomain);
 console.log('  🗂️ Project ID:', firebaseConfig.projectId);
 console.log('  🔒 Güvenlik: Production modu aktif');
+
+export { auth, db, securityConfig };

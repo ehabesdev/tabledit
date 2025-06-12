@@ -1,0 +1,38 @@
+# Enable rewrite engine
+RewriteEngine On
+
+# Force HTTPS (isteğe bağlı)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# HTML dosyaları için doğrudan erişim
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} \.(html)$ [NC]
+RewriteRule ^(.*)$ $1 [L]
+
+# Verify.html için özel kural
+RewriteRule ^verify\.html$ verify.html [L]
+
+# Index.html'yi varsayılan sayfa yap
+DirectoryIndex index.html
+
+# MIME types
+AddType text/html .html
+AddType application/javascript .js
+AddType text/css .css
+
+# Cache control
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/html "access plus 1 hour"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType text/css "access plus 1 week"
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
