@@ -22,12 +22,6 @@ Gerçek zamanlı işbirliği, gelişmiş dosya yönetimi ve profesyonel UI/UX de
 
 ## ✨ **Öne Çıkan Özellikler**
 
-### 🎨 **Modern Kullanıcı Arayüzü**
-- 🌈 **Gradient tasarım** ve smooth animasyonlar
-- 📱 **Responsive design** - tüm cihazlarda mükemmel
-- 🌙 **Dark mode** desteği
-- 🎭 **Micro-interactions** ve hover efektleri
-
 ### 🔥 **Güçlü Tablo Editörü**
 - 📊 **Excel benzeri** hücre düzenleme
 - 🎨 **Renk paleti** ve formatting seçenekleri
@@ -151,7 +145,6 @@ tabledit/
 - ✨ **Smooth transitions** - Sayfa geçişleri
 - 🌊 **Hover effects** - Buton etkileşimleri  
 - 📱 **Loading animations** - Yükleme göstergeleri
-- 🎪 **Micro-interactions** - Kullanıcı geri bildirimleri
 
 ---
 
