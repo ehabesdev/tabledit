@@ -217,7 +217,6 @@ const firebaseConfig = {
 |:---:|:---:|
 | 🚀 **Performans Skoru** | 95/100 |
 | ♿ **Erişilebilirlik** | AA Uyumlu |
-| 📱 **Responsive** | %100 |
 | 🔒 **Güvenlik** | A+ |
 
 </div>
