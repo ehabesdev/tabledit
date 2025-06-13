@@ -1,4 +1,4 @@
-# 🚀 **Tabledit** - Profesyonel Tablo Editörü
+# 🚀 **Tabledit**
 
 <div align="center">
 
@@ -14,7 +14,7 @@
 **Tabledit**, Excel benzeri güçlü özelliklerle donatılmış, bulut tabanlı modern tablo editörüdür. 
 Gerçek zamanlı işbirliği, gelişmiş dosya yönetimi ve profesyonel UI/UX deneyimi sunar.
 
-[🎮 **Canlı Demo**](https://your-demo-link.com) • [📖 **Dokümantasyon**](https://docs.tabledit.com) • [🐛 **Hata Bildir**](https://github.com/your-repo/issues)
+[🎮 **Canlı Demo**](https://ehabesdev.github.io/tabledit) • [📖 **Kullanım Kılavuzu**](#-kullanım-kılavuzu) • [🐛 **Hata Bildir**](https://github.com/ehabesdev/tabledit/issues)
 
 </div>
 
@@ -59,7 +59,7 @@ Gerçek zamanlı işbirliği, gelişmiş dosya yönetimi ve profesyonel UI/UX de
 
 ```bash
 # 1️⃣ Projeyi klonlayın
-git clone https://github.com/your-username/tabledit.git
+git clone https://github.com/ehabesdev/tabledit.git
 cd tabledit
 
 # 2️⃣ HTTP server başlatın
@@ -259,7 +259,7 @@ Bu proje **MIT Lisansı** altında lisanslanmıştır. Detaylar için [LICENSE](
 
 ### 🌟 **Tabledit ile Tablolarınızı Profesyonel Seviyeye Taşıyın!**
 
-**Made with ❤️ by AGD Team**
+**Made with ❤️ by [ehabesdev](https://github.com/ehabesdev)**
 
 ⭐ **Bu projeyi beğendiyseniz yıldız vermeyi unutmayın!** ⭐
 
