@@ -52,14 +52,14 @@ async function initializeEmailJS() {
         if (window.emailjs && EMAILJS_CONFIG.PUBLIC_KEY) {
             window.emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
             emailjsInitialized = true;
-            console.log('✅ EmailJS başarıyla başlatıldı');
+
             return true;
         }
         
         throw new Error('EmailJS yapılandırması eksik');
         
     } catch (error) {
-        console.error('❌ EmailJS başlatma hatası:', error);
+
         emailjsInitialized = false;
         return false;
     }
@@ -85,11 +85,11 @@ export async function createVerificationToken(userId, email, name) {
         };
         
         await setDoc(doc(db, 'emailVerificationTokens', token), tokenData);
-        console.log('✅ Doğrulama token\'ı oluşturuldu');
+
         return token;
         
     } catch (error) {
-        console.error('❌ Token oluşturma hatası:', error);
+
         if (error.code === 'permission-denied') {
             throw new Error('Token oluşturma yetkisi yok. Lütfen tekrar giriş yapın.');
         }
@@ -301,7 +301,7 @@ async function sendEmailViaEmailJS(emailData) {
             templateParams
         );
         
-        console.log('✅ EmailJS ile e-posta gönderildi');
+
         return {
             success: true,
             method: 'emailjs',
@@ -310,14 +310,14 @@ async function sendEmailViaEmailJS(emailData) {
         };
         
     } catch (error) {
-        console.error('❌ EmailJS gönderme hatası:', error);
+
         throw new Error('E-posta gönderilemedi: ' + error.message);
     }
 }
 
 export async function sendVerificationEmail(userId, email, name) {
     try {
-        console.log('📧 Doğrulama e-postası hazırlanıyor:', email);
+
         
         const token = await createVerificationToken(userId, email, name);
         const repoName = '/tabledit';
@@ -343,9 +343,9 @@ export async function sendVerificationEmail(userId, email, name) {
                 sendMethod: sendResult.method,
                 messageId: sendResult.messageId
             });
-            console.log('✅ E-posta log kaydedildi');
+
         } catch (logError) {
-            console.warn('⚠️ E-posta log kaydedilemedi (ancak e-posta gönderildi):', logError.code);
+
         }
         
         return {
@@ -356,7 +356,7 @@ export async function sendVerificationEmail(userId, email, name) {
         };
         
     } catch (error) {
-        console.error('❌ E-posta gönderme hatası:', error);
+
         
         try {
             await addDoc(collection(db, 'emailLogs'), {
@@ -368,7 +368,7 @@ export async function sendVerificationEmail(userId, email, name) {
                 sentAt: serverTimestamp()
             });
         } catch (logError) {
-            console.error('❌ Log kaydetme hatası:', logError);
+
         }
         
         throw new Error('E-posta gönderilemedi: ' + error.message);
@@ -433,7 +433,7 @@ export async function verifyEmailToken(token) {
             userAgent: navigator.userAgent.substring(0, 500)
         });
         
-        console.log('✅ E-posta doğrulama başarılı');
+
         
         return {
             success: true,
@@ -443,7 +443,7 @@ export async function verifyEmailToken(token) {
         };
         
     } catch (error) {
-        console.error('❌ Token doğrulama hatası:', error);
+
         
         const errorCode = error.message;
         let userMessage = 'Doğrulama sırasında bir hata oluştu.';
@@ -477,7 +477,7 @@ export async function verifyEmailToken(token) {
                     userAgent: navigator.userAgent.substring(0, 500)
                 });
             } catch (logError) {
-                console.error('❌ Log kaydetme hatası:', logError);
+
             }
         }
         
@@ -489,7 +489,7 @@ export async function verifyEmailToken(token) {
 
 export async function resendVerificationEmail(userId, email, name) {
     try {
-        console.log('🔄 E-posta yeniden gönderiliyor:', email);
+
         
         const existingTokensQuery = query(
             collection(db, 'emailVerificationTokens'),
@@ -505,7 +505,7 @@ export async function resendVerificationEmail(userId, email, name) {
         return await sendVerificationEmail(userId, email, name);
         
     } catch (error) {
-        console.error('❌ E-posta yeniden gönderme hatası:', error);
+
         throw new Error('E-posta yeniden gönderilemedi: ' + error.message);
     }
 }
@@ -529,7 +529,7 @@ export async function checkUserVerificationStatus(userId) {
         };
         
     } catch (error) {
-        console.error('❌ Doğrulama durumu kontrolü hatası:', error);
+
         return { verified: false, exists: false, error: error.message };
     }
 }
@@ -553,11 +553,11 @@ export async function cleanupExpiredTokens() {
         const deletePromises = expiredTokens.docs.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
         
-        console.log(`🧹 ${expiredTokens.size} süresi dolmuş token temizlendi`);
+
         return expiredTokens.size;
         
     } catch (error) {
-        console.error('❌ Token temizleme hatası:', error);
+
         return -1;
     }
 }

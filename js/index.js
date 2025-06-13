@@ -10,8 +10,18 @@ let autoSaveInterval = null;
 let autoSaveEnabled = false;
 let hasUnsavedChanges = false;
 let lastSaveTime = null;
+let isUserLoggedIn = false;
+let userManager = null;
+let sessionRecoveryData = null;
+let lastAutoSaveData = null;
+let connectionStatus = 'online';
+let pendingOperations = [];
+let syncInProgress = false;
 const CHECKBOX_COLUMN_CLASS = 'row-checkbox-cell';
 const AUTO_SAVE_INTERVAL = 30000;
+const SESSION_STORAGE_KEY = 'tabledit_session';
+const RECOVERY_STORAGE_KEY = 'tabledit_recovery';
+const MAX_RECOVERY_SIZE = 5242880;
 
 const turkeyLocationData = {
     'İstanbul': ['Kadıköy', 'Beşiktaş', 'Şişli', 'Bakırköy', 'Üsküdar', 'Fatih', 'Beyoğlu', 'Kartal', 'Maltepe', 'Pendik', 'Ümraniye', 'Zeytinburnu'],
@@ -29,11 +39,75 @@ async function loadAuthModule() {
         const authModule = await import('./auth.js');
         window.authModule = authModule;
         authModuleLoaded = true;
-        console.log('✅ Auth modülü yüklendi');
         return true;
     } catch (error) {
-        console.error('❌ Auth modülü yüklenemedi:', error);
+
+        showConnectionError('Auth sistemi yüklenemedi. Lütfen sayfayı yenileyin.');
         return false;
+    }
+}
+
+function showConnectionError(message) {
+    const errorEl = document.createElement('div');
+    errorEl.className = 'connection-error';
+    errorEl.innerHTML = `
+        <div class="error-icon">⚠️</div>
+        <div class="error-message">${message}</div>
+        <button onclick="window.location.reload()" class="retry-btn">Yeniden Dene</button>
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        .connection-error {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .error-message {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 16px;
+        }
+        .retry-btn {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .retry-btn:hover {
+            background: linear-gradient(45deg, #c0392b, #a93226);
+        }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(errorEl);
+}
+
+async function loadUserManager() {
+    if (userManager) return userManager;
+    
+    try {
+        userManager = await import('./user-manager.js');
+        return userManager;
+    } catch (error) {
+
+        return null;
     }
 }
 
@@ -75,19 +149,24 @@ async function saveTableAsExcel() {
             return;
         }
 
-        const userManager = await import('./user-manager.js');
-        const tableData = userManager.serializeTableData();
+        const manager = await loadUserManager();
+        if (!manager) {
+            await saveAsExcelFile();
+            return;
+        }
+
+        const tableData = manager.serializeTableData();
         
         let fileName = currentFileName || `Tabledit_${new Date().toISOString().slice(0, 10)}`;
         
         if (currentFileId) {
-            await userManager.updateUserFile(currentFileId, fileName, tableData);
+            await manager.updateUserFile(currentFileId, fileName, tableData);
             showNotification('Dosya başarıyla güncellendi', 'success');
         } else {
             fileName = prompt('Dosya adını girin:', fileName);
             if (!fileName) return;
             
-            const fileId = await userManager.saveUserTable(fileName, tableData);
+            const fileId = await manager.saveUserTable(fileName, tableData);
             currentFileId = fileId;
             currentFileName = fileName;
             showNotification('Dosya başarıyla kaydedildi', 'success');
@@ -98,9 +177,8 @@ async function saveTableAsExcel() {
         updateSaveStatus();
         
     } catch (error) {
-        console.error('❌ Dosya kaydetme hatası:', error);
+
         showNotification('Dosya kaydedilirken hata oluştu: ' + error.message, 'error');
-        
         await saveAsExcelFile();
     }
 }
@@ -223,11 +301,9 @@ async function saveAsExcelFile() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
-        console.log('✅ Excel dosyası başarıyla indirildi');
 
     } catch (error) {
-        console.error('❌ Excel indirme hatası:', error);
+
         alert('Dosya indirilirken bir hata oluştu: ' + error.message);
     }
 }
@@ -263,34 +339,10 @@ function loadTableFromExcel() {
                     loadExcelData(worksheet);
                     
                     const fileName = file.name.replace(/\.[^/.]+$/, "");
-                    const authLoaded = await loadAuthModule();
+                    await autoSaveImportedFile(fileName);
                     
-                    if (authLoaded && window.authModule && window.authModule.isUserLoggedIn()) {
-                        try {
-                            const userManager = await import('./user-manager.js');
-                            const tableData = userManager.serializeTableData();
-                            
-                            const fileId = await userManager.saveUserTable(fileName, tableData);
-                            currentFileId = fileId;
-                            currentFileName = fileName;
-                            
-                            showNotification(`"${fileName}" dosyası başarıyla yüklendi ve kaydedildi`, 'success');
-                            hasUnsavedChanges = false;
-                            lastSaveTime = new Date();
-                            updateSaveStatus();
-                            
-                        } catch (saveError) {
-                            console.warn('Dosya otomatik kaydedilemedi:', saveError);
-                            showNotification(`Dosya yüklendi ancak kaydedilemedi: ${saveError.message}`, 'warning');
-                        }
-                    } else {
-                        showNotification('Dosya yüklendi. Kaydedilmesi için giriş yapmanız gerekir.', 'info');
-                    }
-                    
-                    console.log('✅ Excel dosyası başarıyla yüklendi');
-
                 } catch (error) {
-                    console.error('❌ Excel yükleme hatası:', error);
+
                     alert('Dosya yüklenirken hata oluştu: ' + error.message);
                 }
             };
@@ -298,6 +350,177 @@ function loadTableFromExcel() {
         }
     };
     input.click();
+}
+
+async function autoSaveImportedFile(fileName) {
+    const authLoaded = await loadAuthModule();
+    
+    if (authLoaded && window.authModule && window.authModule.isUserLoggedIn()) {
+        try {
+            const manager = await loadUserManager();
+            if (manager) {
+                const tableData = manager.serializeTableData();
+                
+                if (!tableData || !tableData.rows || tableData.rows.length === 0) {
+                    showNotification('Boş tablo, otomatik kayıt yapılmadı', 'warning');
+                    return null;
+                }
+                
+                const fileId = await manager.saveUserTable(fileName, tableData);
+                currentFileId = fileId;
+                currentFileName = fileName;
+                
+                showNotification(`"${fileName}" dosyası başarıyla yüklendi ve kaydedildi`, 'success');
+                hasUnsavedChanges = false;
+                lastSaveTime = new Date();
+                updateSaveStatus();
+                startAutoSave();
+                
+                showFileAddedNotification(fileName, fileId);
+                
+                return fileId;
+            }
+        } catch (saveError) {
+
+            showNotification(`Dosya yüklendi ancak kaydedilemedi: ${saveError.message}`, 'warning');
+            return null;
+        }
+    } else {
+        showNotification('Dosya yüklendi. Kalıcı kaydetmek için giriş yapmanız gerekir.', 'info');
+        return null;
+    }
+}
+
+function showFileAddedNotification(fileName, fileId) {
+    const notification = document.createElement('div');
+    notification.className = 'file-added-notification';
+    notification.innerHTML = `
+        <div class="notification-content">
+            <div class="notification-icon">📁</div>
+            <div class="notification-text">
+                <h4>Dosya Eklendi!</h4>
+                <p>"${fileName}" dosyalarınıza kaydedildi</p>
+            </div>
+            <div class="notification-actions">
+                <button onclick="goToFiles()" class="btn-small btn-primary">
+                    📂 Dosyalarım
+                </button>
+                <button onclick="closeFileNotification(this)" class="btn-small btn-secondary">
+                    ✕
+                </button>
+            </div>
+        </div>
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        .file-added-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            max-width: 350px;
+            animation: slideInUp 0.4s ease-out;
+            border: 2px solid #27ae60;
+        }
+        .notification-content {
+            padding: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        .notification-text h4 {
+            margin: 0 0 4px 0;
+            color: #27ae60;
+            font-size: 16px;
+        }
+        .notification-text p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .notification-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-small.btn-primary {
+            background: linear-gradient(45deg, #27ae60, #229954);
+            color: white;
+        }
+        .btn-small.btn-primary:hover {
+            background: linear-gradient(45deg, #229954, #1e8e4e);
+        }
+        .btn-small.btn-secondary {
+            background: #e9ecef;
+            color: #6c757d;
+        }
+        .btn-small.btn-secondary:hover {
+            background: #dee2e6;
+        }
+        @keyframes slideInUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOutDown {
+            from {
+                transform: translateY(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+        }
+    `;
+    
+    if (!document.querySelector('#file-notification-styles')) {
+        style.id = 'file-notification-styles';
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideOutDown 0.4s ease-out';
+            setTimeout(() => notification.remove(), 400);
+        }
+    }, 8000);
+}
+
+window.goToFiles = function() {
+    window.location.href = './files.html';
+}
+
+window.closeFileNotification = function(button) {
+    const notification = button.closest('.file-added-notification');
+    if (notification) {
+        notification.style.animation = 'slideOutDown 0.4s ease-out';
+        setTimeout(() => notification.remove(), 400);
+    }
 }
 
 function loadExcelData(worksheet) {
@@ -688,7 +911,6 @@ function addRow() {
     const headerRow = table.querySelector('thead tr');
 
     if (!headerRow) {
-        console.error("Başlık satırı bulunamadı, satır eklenemiyor.");
         const tempTh = document.createElement('th');
         tempTh.textContent = "ID";
         tempTh.style.background = '#2c3e50';
@@ -1073,10 +1295,8 @@ function exportToExcelBasic() {
         XLSX.utils.book_append_sheet(wb, ws, "Tabledit");
         XLSX.writeFile(wb, `Tabledit_Basit_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-        console.log('✅ Basit Excel dosyası başarıyla dışa aktarıldı');
-
     } catch (error) {
-        console.error('❌ Basit Excel dışa aktarma hatası:', error);
+
         alert('Dosya dışa aktarılırken hata oluştu: ' + error.message);
     } finally {
         if (wasMultiDeleteActive) showRowCheckboxes();
@@ -1194,10 +1414,8 @@ async function exportToExcelAdvanced() {
         link.click();
         document.body.removeChild(link);
 
-        console.log('✅ Formatlı Excel dosyası başarıyla dışa aktarıldı');
-
     } catch (error) {
-        console.error('❌ Formatlı Excel dışa aktarma hatası:', error);
+
         alert('Dosya dışa aktarılırken hata oluştu: ' + error.message);
     } finally {
         if (wasMultiDeleteActive) showRowCheckboxes();
@@ -1238,7 +1456,6 @@ function colorToARGB(color) {
         if (namedColorMap[color.toLowerCase()]) {
             return namedColorMap[color.toLowerCase()];
         }
-        console.warn("Bilinmeyen renk adı:", color, "Beyaz varsayılıyor.");
         return 'FFFFFFFF';
     }
     
@@ -1287,10 +1504,8 @@ function exportToCSV() {
         link.click();
         document.body.removeChild(link);
 
-        console.log('✅ CSV dosyası başarıyla dışa aktarıldı');
-
     } catch (error) {
-        console.error('❌ CSV dışa aktarma hatası:', error);
+
         alert('Dosya dışa aktarılırken hata oluştu: ' + error.message);
     } finally {
         if (wasMultiDeleteActive) showRowCheckboxes();
@@ -1412,6 +1627,7 @@ window.toggleUserDropdown = async function () {
 window.logoutUser = async function () {
     const authLoaded = await loadAuthModule();
     if (authLoaded && window.authModule) {
+        stopAutoSave();
         window.authModule.logoutUser();
     } else {
         alert('Çıkış sistemi yüklenirken hata oluştu. Sayfayı yenileyin.');
@@ -1501,59 +1717,94 @@ async function loadFileFromUrl() {
             currentFileId = fileId;
             currentFileName = fileData.name;
             
-            const userManager = await import('./user-manager.js');
-            userManager.deserializeTableData(fileData.data);
-            
-            hasUnsavedChanges = false;
-            lastSaveTime = new Date(fileData.updatedAt);
-            updateSaveStatus();
-            
-            showNotification(`"${fileData.name}" dosyası açıldı`, 'success');
-            
-            window.history.replaceState({}, document.title, window.location.pathname);
+            const manager = await loadUserManager();
+            if (manager) {
+                manager.deserializeTableData(fileData.data);
+                
+                hasUnsavedChanges = false;
+                lastSaveTime = new Date(fileData.updatedAt);
+                updateSaveStatus();
+                startAutoSave();
+                
+                showNotification(`"${fileData.name}" dosyası açıldı`, 'success');
+                
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
         }
         
     } catch (error) {
-        console.error('URL\'den dosya yüklenemedi:', error);
+
         showNotification('Dosya açılırken hata oluştu: ' + error.message, 'error');
     }
 }
 
 function startAutoSave() {
+    if (!isUserLoggedIn) return;
+    
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
     }
     
     autoSaveInterval = setInterval(async () => {
+        if (syncInProgress) return;
+        
         const authLoaded = await loadAuthModule();
         if (!authLoaded || !window.authModule || !window.authModule.isUserLoggedIn()) {
-            return;
-        }
-        
-        if (!hasUnsavedChanges || !currentFileId) {
+            stopAutoSave();
             return;
         }
         
         try {
-            const userManager = await import('./user-manager.js');
-            const tableData = userManager.serializeTableData();
+            const manager = await loadUserManager();
+            if (!manager) return;
             
-            await userManager.updateUserFile(currentFileId, currentFileName, tableData);
+            const tableData = manager.serializeTableData();
+            
+            if (!tableData || !tableData.rows || tableData.rows.length === 0) {
+                return;
+            }
+            
+            saveToLocalStorage(tableData);
+            
+            if (connectionStatus === 'offline') {
+                addToPendingOperations('autosave', { tableData, fileId: currentFileId, fileName: currentFileName });
+                showNotification('Offline - yerel kayıt yapıldı', 'info', 2000);
+                return;
+            }
+            
+            if (!currentFileId) {
+                const fileName = currentFileName || `Otomatik_${new Date().toISOString().slice(0, 16).replace('T', '_').replace(/:/g, '-')}`;
+                currentFileId = await manager.saveUserTable(fileName, tableData);
+                currentFileName = fileName;
+                showNotification(`Yeni dosya "${fileName}" oluşturuldu`, 'success', 3000);
+            } else if (hasUnsavedChanges) {
+                await manager.updateUserFile(currentFileId, currentFileName, tableData);
+                showNotification('Otomatik kayıt tamamlandı', 'info', 1500);
+            }
             
             hasUnsavedChanges = false;
             lastSaveTime = new Date();
+            lastAutoSaveData = tableData;
             updateSaveStatus();
             
-            showNotification('Otomatik kayıt tamamlandı', 'info', 2000);
-            
         } catch (error) {
-            console.error('Otomatik kayıt hatası:', error);
-            showNotification('Otomatik kayıt başarısız: ' + error.message, 'warning', 3000);
+
+            if (error.message.includes('Rate limit') || error.message.includes('Çok fazla')) {
+                return;
+            }
+            
+            const tableData = manager?.serializeTableData();
+            if (tableData) {
+                saveToLocalStorage(tableData);
+                addToPendingOperations('autosave', { tableData, fileId: currentFileId, fileName: currentFileName });
+            }
+            
+            showNotification('Otomatik kayıt hatası - yerel kayıt yapıldı', 'warning', 2000);
         }
     }, AUTO_SAVE_INTERVAL);
     
     autoSaveEnabled = true;
-    console.log('Otomatik kayıt başlatıldı (30 saniye aralıklarla)');
+    showNotification('Otomatik kayıt başlatıldı (30 saniye)', 'success', 2000);
 }
 
 function stopAutoSave() {
@@ -1562,7 +1813,133 @@ function stopAutoSave() {
         autoSaveInterval = null;
     }
     autoSaveEnabled = false;
-    console.log('Otomatik kayıt durduruldu');
+    showNotification('Otomatik kayıt durduruldu', 'info', 1500);
+}
+
+function saveToLocalStorage(tableData) {
+    try {
+        const sessionData = {
+            tableData,
+            currentFileId,
+            currentFileName,
+            timestamp: new Date().toISOString(),
+            hasUnsavedChanges
+        };
+        
+        const dataSize = JSON.stringify(sessionData).length;
+        if (dataSize > MAX_RECOVERY_SIZE) {
+
+            return;
+        }
+        
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+        
+        const recoveryData = {
+            tableData,
+            timestamp: new Date().toISOString(),
+            url: window.location.href
+        };
+        localStorage.setItem(RECOVERY_STORAGE_KEY, JSON.stringify(recoveryData));
+        
+    } catch (error) {
+
+    }
+}
+
+function loadFromLocalStorage() {
+    try {
+        const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
+        const recoveryData = localStorage.getItem(RECOVERY_STORAGE_KEY);
+        
+        if (sessionData) {
+            const parsed = JSON.parse(sessionData);
+            const sessionAge = new Date() - new Date(parsed.timestamp);
+            
+            if (sessionAge < 3600000) {
+                return parsed;
+            }
+        }
+        
+        if (recoveryData) {
+            const parsed = JSON.parse(recoveryData);
+            const recoveryAge = new Date() - new Date(parsed.timestamp);
+            
+            if (recoveryAge < 86400000) {
+                return { recoveryData: parsed };
+            }
+        }
+        
+        return null;
+    } catch (error) {
+
+        return null;
+    }
+}
+
+function clearLocalStorage() {
+    try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        localStorage.removeItem(RECOVERY_STORAGE_KEY);
+    } catch (error) {
+
+    }
+}
+
+function addToPendingOperations(type, data) {
+    pendingOperations.push({
+        type,
+        data,
+        timestamp: new Date().toISOString(),
+        id: Date.now() + Math.random()
+    });
+    
+    if (pendingOperations.length > 50) {
+        pendingOperations = pendingOperations.slice(-30);
+    }
+}
+
+async function processPendingOperations() {
+    if (syncInProgress || pendingOperations.length === 0) return;
+    
+    syncInProgress = true;
+    let processedCount = 0;
+    
+    try {
+        const manager = await loadUserManager();
+        if (!manager) return;
+        
+        for (const operation of [...pendingOperations]) {
+            try {
+                if (operation.type === 'autosave') {
+                    const { tableData, fileId, fileName } = operation.data;
+                    
+                    if (fileId) {
+                        await manager.updateUserFile(fileId, fileName, tableData);
+                    } else {
+                        const newFileId = await manager.saveUserTable(fileName, tableData);
+                        if (!currentFileId) {
+                            currentFileId = newFileId;
+                            currentFileName = fileName;
+                        }
+                    }
+                }
+                
+                pendingOperations = pendingOperations.filter(op => op.id !== operation.id);
+                processedCount++;
+                
+            } catch (error) {
+
+                break;
+            }
+        }
+        
+        if (processedCount > 0) {
+            showNotification(`${processedCount} offline işlem senkronize edildi`, 'success', 3000);
+        }
+        
+    } finally {
+        syncInProgress = false;
+    }
 }
 
 function markAsChanged() {
@@ -1577,57 +1954,328 @@ function updateSaveStatus() {
         return;
     }
     
-    if (hasUnsavedChanges) {
-        statusEl.innerHTML = '● Kaydedilmemiş değişiklikler';
-        statusEl.className = 'save-status unsaved';
+    let statusHTML = '';
+    let statusClass = 'save-status';
+    
+    if (connectionStatus === 'offline') {
+        statusHTML = '📴 Offline - yerel kayıt aktif';
+        statusClass += ' offline';
+    } else if (syncInProgress) {
+        statusHTML = '🔄 Senkronizasyon...';
+        statusClass += ' syncing';
+    } else if (pendingOperations.length > 0) {
+        statusHTML = `⏳ ${pendingOperations.length} işlem bekliyor`;
+        statusClass += ' pending';
+    } else if (hasUnsavedChanges) {
+        statusHTML = '● Kaydedilmemiş değişiklikler';
+        statusClass += ' unsaved';
     } else if (lastSaveTime) {
         const timeAgo = formatTimeAgo(lastSaveTime);
-        statusEl.innerHTML = `✓ ${timeAgo} kaydedildi`;
-        statusEl.className = 'save-status saved';
+        statusHTML = `✓ ${timeAgo} kaydedildi`;
+        statusClass += ' saved';
     } else {
-        statusEl.innerHTML = 'Yeni dosya';
-        statusEl.className = 'save-status new';
+        statusHTML = '📄 Yeni dosya';
+        statusClass += ' new';
     }
+    
+    if (autoSaveEnabled) {
+        statusHTML += ' <span class="auto-save-indicator">🔄</span>';
+    }
+    
+    statusEl.innerHTML = statusHTML;
+    statusEl.className = statusClass;
+    
+    updateConnectionIndicator();
+}
+
+function updateConnectionIndicator() {
+    const indicator = document.getElementById('connectionIndicator');
+    if (!indicator) {
+        const statusEl = document.getElementById('saveStatus');
+        if (statusEl && statusEl.parentNode) {
+            const connIndicator = document.createElement('div');
+            connIndicator.id = 'connectionIndicator';
+            connIndicator.className = `connection-indicator ${connectionStatus}`;
+            statusEl.parentNode.insertBefore(connIndicator, statusEl);
+        }
+        return;
+    }
+    
+    indicator.className = `connection-indicator ${connectionStatus}`;
+    indicator.title = connectionStatus === 'online' ? 'Çevrimiçi' : 'Çevrimdışı - yerel kayıt aktif';
+}
+
+function showSessionRecoveryDialog(recoveredData) {
+    const modal = document.createElement('div');
+    modal.className = 'modal session-recovery-modal';
+    modal.innerHTML = `
+        <div class="modal-content recovery-content">
+            <div class="modal-header recovery-header">
+                <h3>💾 Oturum Kurtarma</h3>
+            </div>
+            <div class="modal-body recovery-body">
+                <div class="recovery-info">
+                    <div class="recovery-icon">🔄</div>
+                    <div class="recovery-message">
+                        <h4>Kaldığınız yerden devam edin</h4>
+                        <p>Önceki oturumunuzdan kaydedilmemiş değişiklikler bulundu:</p>
+                        <div class="recovery-details">
+                            ${recoveredData.currentFileName ? 
+                                `<p><strong>Dosya:</strong> ${recoveredData.currentFileName}</p>` : 
+                                '<p><strong>Yeni dosya</strong> (kaydedilmemiş)</p>'
+                            }
+                            <p><strong>Son güncelleme:</strong> ${formatTimeAgo(new Date(recoveredData.timestamp))}</p>
+                            ${recoveredData.tableData && recoveredData.tableData.rows ? 
+                                `<p><strong>Satır sayısı:</strong> ${recoveredData.tableData.rows.length}</p>` : ''
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="recovery-actions">
+                    <button class="btn btn-primary recovery-restore" onclick="restoreSession()">
+                        🔄 Oturumu Geri Yükle
+                    </button>
+                    <button class="btn btn-secondary recovery-ignore" onclick="ignoreRecovery()">
+                        ❌ Yok Say
+                    </button>
+                    <button class="btn btn-outline recovery-new" onclick="startFresh()">
+                        🆕 Temiz Başla
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    
+    sessionRecoveryData = recoveredData;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        .session-recovery-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .recovery-content {
+            max-width: 500px;
+            width: 90%;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .recovery-header {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .recovery-body {
+            padding: 20px;
+        }
+        .recovery-info {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .recovery-icon {
+            font-size: 48px;
+            flex-shrink: 0;
+        }
+        .recovery-message h4 {
+            margin: 0 0 8px 0;
+            color: #2c3e50;
+        }
+        .recovery-details {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+        .recovery-details p {
+            margin: 4px 0;
+        }
+        .recovery-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .recovery-actions .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #dee2e6;
+            color: #6c757d;
+        }
+        .btn-outline:hover {
+            background: #f8f9fa;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+window.restoreSession = function() {
+    if (!sessionRecoveryData) return;
+    
+    try {
+        const manager = userManager || window.userManager;
+        if (manager && sessionRecoveryData.tableData) {
+            manager.deserializeTableData(sessionRecoveryData.tableData);
+            
+            currentFileId = sessionRecoveryData.currentFileId;
+            currentFileName = sessionRecoveryData.currentFileName;
+            hasUnsavedChanges = sessionRecoveryData.hasUnsavedChanges || true;
+            
+            updateSaveStatus();
+            updateStats();
+            
+            showNotification('Oturum başarıyla geri yüklendi!', 'success', 3000);
+        }
+    } catch (error) {
+
+        showNotification('Oturum geri yüklenirken hata oluştu', 'error', 3000);
+    }
+    
+    closeRecoveryDialog();
+}
+
+window.ignoreRecovery = function() {
+    closeRecoveryDialog();
+}
+
+window.startFresh = function() {
+    clearLocalStorage();
+    closeRecoveryDialog();
+    showNotification('Temiz bir başlangıç yapıldı', 'info', 2000);
+}
+
+function closeRecoveryDialog() {
+    const modal = document.querySelector('.session-recovery-modal');
+    if (modal) {
+        modal.style.animation = 'fadeOut 0.3s ease-out';
+        setTimeout(() => modal.remove(), 300);
+    }
+    sessionRecoveryData = null;
 }
 
 function createSaveStatusIndicator() {
     const toolbar = document.querySelector('.quick-toolbar');
     if (!toolbar) return;
     
+    const statusContainer = document.createElement('div');
+    statusContainer.className = 'status-container';
+    
+    const connectionIndicator = document.createElement('div');
+    connectionIndicator.id = 'connectionIndicator';
+    connectionIndicator.className = 'connection-indicator online';
+    connectionIndicator.title = 'Çevrimiçi';
+    
     const statusEl = document.createElement('div');
     statusEl.id = 'saveStatus';
     statusEl.className = 'save-status new';
-    statusEl.innerHTML = 'Yeni dosya';
+    statusEl.innerHTML = '📄 Yeni dosya';
     
     const separatorEl = document.createElement('div');
     separatorEl.className = 'toolbar-separator';
     
+    statusContainer.appendChild(connectionIndicator);
+    statusContainer.appendChild(statusEl);
+    
     toolbar.appendChild(separatorEl);
-    toolbar.appendChild(statusEl);
+    toolbar.appendChild(statusContainer);
     
     const style = document.createElement('style');
     style.textContent = `
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .connection-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+        .connection-indicator.online {
+            background: #27ae60;
+            box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.2);
+        }
+        .connection-indicator.offline {
+            background: #e74c3c;
+            box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2);
+            animation: blink 2s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
         .save-status {
             font-size: 12px;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 6px 12px;
+            border-radius: 6px;
             font-weight: 500;
             white-space: nowrap;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
         .save-status.saved {
-            background: #d4edda;
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
             color: #155724;
             border: 1px solid #c3e6cb;
         }
         .save-status.unsaved {
-            background: #fff3cd;
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
             color: #856404;
             border: 1px solid #ffeaa7;
         }
         .save-status.new {
-            background: #e2e3e5;
+            background: linear-gradient(45deg, #e2e3e5, #d6d8db);
             color: #495057;
             border: 1px solid #d6d8db;
+        }
+        .save-status.offline {
+            background: linear-gradient(45deg, #f8d7da, #f1aeb5);
+            color: #721c24;
+            border: 1px solid #f1aeb5;
+        }
+        .save-status.syncing {
+            background: linear-gradient(45deg, #d1ecf1, #b8daff);
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        .save-status.pending {
+            background: linear-gradient(45deg, #ffeeba, #fed136);
+            color: #856404;
+            border: 1px solid #fed136;
+        }
+        .auto-save-indicator {
+            font-size: 10px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
     `;
     document.head.appendChild(style);
@@ -1792,7 +2440,7 @@ function setupFormEventListeners() {
                 try {
                     await window.authModule.registerUser(formData);
                 } catch (error) {
-                    console.error('Kayıt hatası:', error);
+
                 }
             } else {
                 alert('Sistem hatası: Auth modülü yüklenemedi');
@@ -1821,7 +2469,7 @@ function setupFormEventListeners() {
                 try {
                     await window.authModule.loginUser(email, password);
                 } catch (error) {
-                    console.error('Giriş hatası:', error);
+
                 }
             } else {
                 alert('Sistem hatası: Auth modülü yüklenemedi');
@@ -1877,8 +2525,6 @@ function initializeEventListeners() {
 }
 
 function initializeApplication() {
-    console.log('🚀 Tabledit uygulaması başlatılıyor...');
-    
     try {
         updateStats();
         updateColumnClickEvents();
@@ -1887,13 +2533,24 @@ function initializeApplication() {
         setupFormEventListeners();
         setupTableChangeListeners();
         createSaveStatusIndicator();
+        initializeConnectionMonitoring();
+        
+        const recoveredData = loadFromLocalStorage();
+        if (recoveredData && recoveredData.tableData) {
+            setTimeout(() => {
+                showSessionRecoveryDialog(recoveredData);
+            }, 1000);
+        }
         
         loadAuthModule().then(authLoaded => {
             if (authLoaded && window.authModule) {
                 window.authModule.initializeAuth();
-                console.log('✅ Auth sistemi başlatıldı');
                 
-                window.authModule.auth.onAuthStateChanged(async (user) => {
+                const { auth } = window.authModule;
+                if (auth && auth.onAuthStateChanged) {
+                    auth.onAuthStateChanged(async (user) => {
+                    isUserLoggedIn = !!user;
+                    
                     if (user) {
                         const { checkUserVerificationStatus } = await import('./email-verification.js');
                         const verificationStatus = await checkUserVerificationStatus(user.uid);
@@ -1901,14 +2558,21 @@ function initializeApplication() {
                         if (verificationStatus.verified) {
                             setTimeout(() => {
                                 startAutoSave();
+                                if (connectionStatus === 'online') {
+                                    processPendingOperations();
+                                }
                             }, 2000);
                         }
                     } else {
                         stopAutoSave();
+                        clearLocalStorage();
                     }
-                });
+                    
+                    updateSaveStatus();
+                    });
+                }
             } else {
-                console.error('❌ Auth sistemi yüklenemedi');
+
                 const authButtons = document.querySelector('.auth-buttons');
                 if (authButtons) {
                     authButtons.innerHTML = '<span style="color: red; font-size: 12px;">Auth sistemi yüklenemedi</span>';
@@ -1923,17 +2587,45 @@ function initializeApplication() {
         
         if (verifiedStatus === 'success') {
             setTimeout(() => {
-                showNotification('🎉 E-posta doğrulama başarılı! Hoş geldiniz!\n\nArtık Tabledit\'in tüm özelliklerini kullanabilirsiniz.', 'success', 5000);
+                showNotification('E-posta doğrulama başarılı! Hoş geldiniz! Artık Tabledit\'in tüm özelliklerini kullanabilirsiniz.', 'success', 5000);
                 const newUrl = window.location.href.split('?')[0];
                 window.history.replaceState({}, document.title, newUrl);
             }, 1000);
         }
         
-        console.log('✅ Tabledit uygulaması başarıyla başlatıldı');
-        
     } catch (error) {
-        console.error('❌ Uygulama başlatma hatası:', error);
+
+        showNotification('Uygulama başlatılırken hata oluştu', 'error', 5000);
     }
+}
+
+function initializeConnectionMonitoring() {
+    function updateConnectionStatus() {
+        const oldStatus = connectionStatus;
+        connectionStatus = navigator.onLine ? 'online' : 'offline';
+        
+        if (oldStatus !== connectionStatus) {
+            updateSaveStatus();
+            
+            if (connectionStatus === 'online') {
+                showNotification('Bağlantı yeniden kuruldu - senkronizasyon başlatılıyor', 'success', 3000);
+                processPendingOperations();
+            } else {
+                showNotification('Bağlantı kesildi - offline modda çalışılıyor', 'warning', 3000);
+            }
+        }
+    }
+    
+    window.addEventListener('online', updateConnectionStatus);
+    window.addEventListener('offline', updateConnectionStatus);
+    
+    setInterval(() => {
+        if (navigator.onLine !== (connectionStatus === 'online')) {
+            updateConnectionStatus();
+        }
+    }, 5000);
+    
+    updateConnectionStatus();
 }
 
 function setupTableChangeListeners() {
@@ -1979,7 +2671,7 @@ if (document.readyState === 'loading') {
 }
 
 window.addEventListener('load', () => {
-    console.log('📄 Sayfa tamamen yüklendi');
+
 });
 
 window.addEventListener('beforeunload', (event) => {

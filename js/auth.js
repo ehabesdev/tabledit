@@ -149,45 +149,45 @@ let authStateInitialized = false;
 
 export function initializeAuth() {
     if (authStateInitialized) {
-        console.log('Auth zaten başlatılmış');
+
         return;
     }
     
-    console.log('🔐 Auth sistemi başlatılıyor...');
+
     
     onAuthStateChanged(auth, async (user) => {
         try {
             currentUser = user;
             
             if (user) {
-                console.log('👤 Kullanıcı girişi tespit edildi:', user.email);
+
                 
                 const verificationStatus = await checkUserVerificationStatus(user.uid);
                 
                 if (!verificationStatus.verified) {
-                    console.log('⚠️ E-posta doğrulanmamış:', user.email);
+
                     showEmailVerificationWarning();
                     await loadUserProfile(user);
                 } else {
-                    console.log('✅ E-posta doğrulanmış kullanıcı:', user.email);
+
                     hideEmailVerificationWarning();
                     showUserInterface();
                     await loadUserProfile(user);
                 }
             } else {
-                console.log('👋 Kullanıcı çıkış yaptı');
+
                 currentUser = null;
                 hideEmailVerificationWarning();
                 showAuthInterface();
             }
         } catch (error) {
-            console.error('❌ Auth state değişikliği hatası:', error);
+
             showAuthInterface();
         }
     });
     
     authStateInitialized = true;
-    console.log('✅ Auth sistemi başlatıldı');
+
 }
 
 function showEmailVerificationWarning() {
@@ -251,7 +251,7 @@ function hideAuthInterface() {
 
 async function loadUserProfile(user) {
     try {
-        console.log('👤 Kullanıcı profili yükleniyor:', user.email);
+
         
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         let userData = {
@@ -267,10 +267,10 @@ async function loadUserProfile(user) {
         }
         
         updateUserDisplay(userData);
-        console.log('✅ Kullanıcı profili yüklendi');
+
         
     } catch (error) {
-        console.error('❌ Profil yükleme hatası:', error);
+
         
         updateUserDisplay({
             name: user.displayName || user.email.split('@')[0],
@@ -307,13 +307,13 @@ function updateUserDisplay(userData) {
         });
         
     } catch (error) {
-        console.error('❌ Kullanıcı arayüzü güncelleme hatası:', error);
+
     }
 }
 
 export async function registerUser(userData) {
     try {
-        console.log('📝 Kullanıcı kaydı başlatılıyor:', userData.email);
+
         
         checkRateLimit('register');
         
@@ -347,7 +347,7 @@ export async function registerUser(userData) {
         showLoading('register');
         hideAuthError('register');
         
-        console.log('🔐 Firebase Auth ile kullanıcı oluşturuluyor...');
+
         const userCredential = await createUserWithEmailAndPassword(
             auth, 
             sanitizedData.email, 
@@ -355,13 +355,13 @@ export async function registerUser(userData) {
         );
         const user = userCredential.user;
         
-        console.log('👤 Firebase Auth kullanıcısı oluşturuldu:', user.uid);
+
         
         await updateProfile(user, {
             displayName: sanitizedData.name
         });
         
-        console.log('💾 Firestore\'a kullanıcı verisi kaydediliyor...');
+
         
         const userDocData = {
             name: sanitizedData.name,
@@ -377,16 +377,16 @@ export async function registerUser(userData) {
         };
         
         await setDoc(doc(db, 'users', user.uid), userDocData);
-        console.log('✅ Kullanıcı verisi Firestore\'a kaydedildi');
+
         
-        console.log('📧 Doğrulama e-postası gönderiliyor...');
+
         try {
             await sendVerificationEmail(user.uid, sanitizedData.email, sanitizedData.name);
-            console.log('✅ Doğrulama e-postası gönderildi');
+
         } catch (emailError) {
-            console.warn('⚠️ E-posta gönderme hatası:', emailError.message);
+
             if (emailError.message.includes('permission')) {
-                console.log('ℹ️ E-posta servisi izin sorunu - manuel doğrulama gerekebilir');
+
             }
         }
         
@@ -408,10 +408,10 @@ export async function registerUser(userData) {
             closeAuthModal('register');
         }, 3000);
         
-        console.log('✅ Kullanıcı kaydı tamamlandı');
+
         
     } catch (error) {
-        console.error('❌ Kayıt hatası:', error);
+
         hideLoading('register');
         
         let errorMessage = 'Kayıt sırasında bir hata oluştu.';
@@ -449,7 +449,7 @@ export async function registerUser(userData) {
 
 export async function loginUser(email, password) {
     try {
-        console.log('🔐 Kullanıcı girişi başlatılıyor:', email);
+
         
         checkRateLimit('login');
         
@@ -466,17 +466,17 @@ export async function loginUser(email, password) {
             throw new Error('Şifre en az 6 karakter olmalıdır.');
         }
         
-        console.log('🔐 Firebase Auth ile giriş yapılıyor...');
+
         const userCredential = await signInWithEmailAndPassword(auth, sanitizedEmail, password);
         const user = userCredential.user;
         
-        console.log('✅ Firebase Auth girişi başarılı:', user.uid);
+
         
         await updateDoc(doc(db, 'users', user.uid), {
             lastLoginAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         }).catch(updateError => {
-            console.warn('⚠️ Son giriş zamanı güncellenemedi:', updateError);
+
         });
         
         const verificationStatus = await checkUserVerificationStatus(user.uid);
@@ -488,10 +488,10 @@ export async function loginUser(email, password) {
             closeAuthModal('login');
         }, 1500);
         
-        console.log('✅ Kullanıcı girişi tamamlandı');
+
         
     } catch (error) {
-        console.error('❌ Giriş hatası:', error);
+
         hideLoading('login');
         
         let errorMessage = 'Giriş sırasında bir hata oluştu.';
@@ -532,7 +532,7 @@ export async function loginUser(email, password) {
 
 export async function resendEmailVerification() {
     try {
-        console.log('🔄 E-posta doğrulama tekrar gönderiliyor...');
+
         
         checkRateLimit('resendVerification');
         
@@ -549,11 +549,11 @@ export async function resendEmailVerification() {
         
         await resendVerificationEmail(currentUser.uid, userData.email, userData.name);
         
-        console.log('✅ E-posta doğrulama tekrar gönderildi');
+
         alert('✅ Doğrulama e-postası tekrar gönderildi!\n\nLütfen e-posta kutunuzu kontrol edin.');
         
     } catch (error) {
-        console.error('❌ E-posta tekrar gönderme hatası:', error);
+
         
         let errorMessage = 'E-posta gönderilirken hata oluştu.';
         
@@ -579,7 +579,7 @@ export async function resendEmailVerification() {
 
 export async function checkEmailVerification() {
     try {
-        console.log('🔍 E-posta doğrulama durumu kontrol ediliyor...');
+
         
         if (!currentUser) {
             alert('❌ Kullanıcı oturumu bulunamadı. Lütfen tekrar giriş yapın.');
@@ -589,18 +589,18 @@ export async function checkEmailVerification() {
         const verificationStatus = await checkUserVerificationStatus(currentUser.uid);
         
         if (verificationStatus.verified) {
-            console.log('✅ E-posta doğrulandı');
+
             alert('🎉 E-posta başarıyla doğrulandı! Sayfa yenileniyor...');
             setTimeout(() => {
                 location.reload();
             }, 1000);
         } else {
-            console.log('⚠️ E-posta henüz doğrulanmamış');
+
             alert('⚠️ E-posta henüz doğrulanmamış.\n\nLütfen e-posta kutunuzu kontrol edin ve doğrulama linkine tıklayın.\n\nE-posta spam klasörünüzde de olabilir.');
         }
         
     } catch (error) {
-        console.error('❌ E-posta doğrulama kontrolü hatası:', error);
+
         
         let errorMessage = 'Kontrol sırasında hata oluştu.';
         
@@ -632,7 +632,7 @@ export function closeEmailVerificationModal() {
 
 export async function logoutUser() {
     try {
-        console.log('🚪 Kullanıcı çıkış yapıyor...');
+
         
         await signOut(auth);
         
@@ -641,10 +641,10 @@ export async function logoutUser() {
             dropdown.classList.remove('show');
         }
         
-        console.log('✅ Kullanıcı çıkışı tamamlandı');
+
         
     } catch (error) {
-        console.error('❌ Çıkış hatası:', error);
+
         alert('Çıkış yapılırken bir hata oluştu: ' + error.message);
     }
 }
@@ -652,7 +652,7 @@ export async function logoutUser() {
 export function openAuthModal(type) {
     const modal = document.getElementById(`${type}Modal`);
     if (!modal) {
-        console.error('Modal bulunamadı:', type);
+
         return;
     }
     

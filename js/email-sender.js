@@ -50,14 +50,14 @@ async function initializeEmailJS() {
         if (window.emailjs && EMAILJS_CONFIG.PUBLIC_KEY) {
             window.emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
             emailjsInitialized = true;
-            console.log('✅ EmailJS başarıyla başlatıldı');
+
             return true;
         }
         
         throw new Error('EmailJS konfigürasyonu eksik');
         
     } catch (error) {
-        console.error('❌ EmailJS başlatma hatası:', error);
+
         emailjsInitialized = false;
         return false;
     }
@@ -65,7 +65,7 @@ async function initializeEmailJS() {
 
 async function loadEmailTemplate(templateData) {
     try {
-        console.log('📧 E-posta şablonu yükleniyor...');
+
         
         const templatePaths = [
             './templates/verification-email.html',
@@ -81,17 +81,17 @@ async function loadEmailTemplate(templateData) {
                 if (response.ok) {
                     template = await response.text();
                     templateFound = true;
-                    console.log('✅ E-posta şablonu yüklendi:', path);
+
                     break;
                 }
             } catch (fetchError) {
-                console.warn(`⚠️ Şablon yüklenemedi: ${path}`, fetchError.message);
+
                 continue;
             }
         }
         
         if (!templateFound) {
-            console.log('⚠️ HTML şablon dosyası bulunamadı, fallback template kullanılıyor');
+
             template = createFallbackEmailTemplate(templateData);
         } else {
             template = processTemplateVariables(template, templateData);
@@ -100,8 +100,6 @@ async function loadEmailTemplate(templateData) {
         return template;
         
     } catch (error) {
-        console.error('❌ Template yükleme hatası:', error);
-        console.log('🔄 Fallback template kullanılıyor...');
         return createFallbackEmailTemplate(templateData);
     }
 }
@@ -123,12 +121,12 @@ function processTemplateVariables(template, templateData) {
         processedTemplate = processedTemplate.replace(regex, value);
     });
     
-    console.log('✅ Template değişkenleri işlendi');
+
     return processedTemplate;
 }
 
 function createFallbackEmailTemplate(templateData) {
-    console.log('⚠️ Fallback template kullanılıyor');
+
     
     return `
 <!DOCTYPE html>
@@ -312,7 +310,7 @@ function createFallbackEmailTemplate(templateData) {
 
 export async function createVerificationToken(userId, email, name) {
     try {
-        console.log('🔑 Doğrulama token\'ı oluşturuluyor:', email);
+
         
         const token = generateVerificationToken();
         
@@ -330,9 +328,9 @@ export async function createVerificationToken(userId, email, name) {
         
         try {
             await setDoc(doc(db, 'emailVerificationTokens', token), tokenData);
-            console.log('✅ Token Firestore\'a kaydedildi:', token.substring(0, 10) + '...');
+
         } catch (firestoreError) {
-            console.warn('⚠️ Token Firestore\'a kaydedilemedi:', firestoreError);
+
             if (firestoreError.code === 'permission-denied') {
                 throw new Error('Token kaydetme izni yok. Lütfen tekrar giriş yapın.');
             }
@@ -341,7 +339,7 @@ export async function createVerificationToken(userId, email, name) {
         return token;
         
     } catch (error) {
-        console.error('❌ Token oluşturma hatası:', error);
+
         throw error;
     }
 }
@@ -361,7 +359,7 @@ async function sendEmailViaEmailJS(emailData) {
             reply_to: "noreply@tabledit.com"
         };
         
-        console.log('📧 EmailJS ile e-posta gönderiliyor...', emailData.to);
+
         
         const result = await window.emailjs.send(
             EMAILJS_CONFIG.SERVICE_ID,
@@ -369,7 +367,7 @@ async function sendEmailViaEmailJS(emailData) {
             templateParams
         );
         
-        console.log('✅ EmailJS ile e-posta gönderildi');
+
         
         return {
             success: true,
@@ -380,7 +378,7 @@ async function sendEmailViaEmailJS(emailData) {
         };
         
     } catch (error) {
-        console.error('❌ EmailJS gönderme hatası:', error);
+
         throw new Error('E-posta gönderilemedi: ' + error.message);
     }
 }
@@ -402,16 +400,16 @@ async function logEmailActivity(emailData, result) {
         };
         
         await addDoc(collection(db, 'emailLogs'), logData);
-        console.log('📝 E-posta aktivitesi loglandı');
+
         
     } catch (error) {
-        console.warn('⚠️ E-posta log kaydetme hatası:', error);
+
     }
 }
 
 export async function sendVerificationEmail(userId, email, name, token) {
     try {
-        console.log('📧 Doğrulama e-postası hazırlanıyor:', email);
+
         
         const baseUrl = window.location.origin;
         const repoName = '/tabledit'
@@ -455,7 +453,7 @@ export async function sendVerificationEmail(userId, email, name, token) {
         };
         
     } catch (error) {
-        console.error('❌ E-posta gönderme hatası:', error);
+
         
         const failResult = { 
             success: false, 
@@ -473,7 +471,7 @@ export async function sendVerificationEmail(userId, email, name, token) {
                 subject: 'E-posta Doğrulama'
             }, failResult);
         } catch (logError) {
-            console.warn('⚠️ Hata log kaydetme hatası:', logError);
+
         }
         
         throw error;
@@ -511,7 +509,7 @@ Modern Tablo Düzenleme Sistemi
 
 export async function loadTemplate(templateType, templateData) {
     try {
-        console.log(`📧 ${templateType} şablonu yükleniyor...`);
+
         
         const templatePaths = [
             `./templates/${templateType}.html`, 
@@ -524,7 +522,7 @@ export async function loadTemplate(templateType, templateData) {
                 if (response.ok) {
                     let template = await response.text();
                     template = processTemplateVariables(template, templateData);
-                    console.log(`✅ ${templateType} şablonu başarıyla işlendi`);
+
                     return template;
                 }
             } catch (fetchError) {
@@ -535,19 +533,19 @@ export async function loadTemplate(templateType, templateData) {
         throw new Error(`Template bulunamadı: ${templateType}`);
         
     } catch (error) {
-        console.error(`❌ ${templateType} şablon yükleme hatası:`, error);
+
         throw error;
     }
 }
 
 export async function sendCustomVerificationEmail(userId, email, name) {
     try {
-        console.log('🚀 Özel doğrulama e-postası işlemi başlatılıyor:', email);
+
         
         const token = await createVerificationToken(userId, email, name);
         const result = await sendVerificationEmail(userId, email, name, token);
         
-        console.log('✅ Doğrulama e-postası işlemi tamamlandı');
+
         
         return {
             success: true,
@@ -559,14 +557,14 @@ export async function sendCustomVerificationEmail(userId, email, name) {
         };
         
     } catch (error) {
-        console.error('❌ Özel doğrulama e-postası hatası:', error);
+
         throw error;
     }
 }
 
 export async function getEmailStats() {
     try {
-        console.log('📊 E-posta istatistikleri hesaplanıyor...');
+
         
         return {
             totalSent: 0,
@@ -583,7 +581,7 @@ export async function getEmailStats() {
         };
         
     } catch (error) {
-        console.error('❌ E-posta istatistikleri hatası:', error);
+
         return null;
     }
 }
@@ -633,10 +631,6 @@ if (typeof window !== 'undefined') {
     };
     
     window.debugEmailSystem = function() {
-        console.log('🧪 E-posta sistemi debug bilgileri:');
-        console.log('📧 Email Sender modülü hazır');
-        console.log('⚙️ EmailJS Durumu:', emailjsInitialized ? 'Hazır' : 'Hazır değil');
-        console.log('🔧 Konfigürasyon:', EMAILJS_CONFIG);
         
         const testToken = generateVerificationToken();
         const testUrl = `${window.location.origin}/verify.html?token=${testToken}`;
@@ -651,7 +645,7 @@ if (typeof window !== 'undefined') {
     };
     
     window.testEmailSending = async function(testEmail = 'test@example.com') {
-        console.log('🧪 E-posta gönderme testi başlatılıyor...');
+
         
         try {
             const testResult = await validateEmailService();
@@ -670,11 +664,11 @@ if (typeof window !== 'undefined') {
             };
             
             const result = await sendEmailViaEmailJS(testData);
-            console.log('✅ Test e-postası gönderildi:', result);
+
             return result;
             
         } catch (error) {
-            console.error('❌ Test e-postası gönderilemedi:', error);
+
             return { success: false, error: error.message };
         }
     };

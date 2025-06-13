@@ -11,11 +11,24 @@ import {
     where,
     orderBy,
     limit,
-    serverTimestamp
+    serverTimestamp,
+    writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const rateLimitTracker = new Map();
+const fileCache = new Map();
 const RATE_LIMIT_WINDOW = 60000;
+const CACHE_DURATION = 300000;
+const MAX_BATCH_SIZE = 500;
+
+let autoSaveInterval = null;
+let autoSaveEnabled = false;
+let lastAutoSaveTime = null;
+let pendingChanges = new Set();
+let connectionStatus = 'online';
+let offlineChanges = [];
+let sessionData = null;
+let isInitialized = false;
 
 function checkRateLimit(action, maxAttempts = 10) {
     if (!auth.currentUser) {
@@ -83,7 +96,7 @@ function calculateFileSize(tableData) {
         
         return sizeInKB;
     } catch (error) {
-        console.error('❌ Dosya boyutu hesaplama hatası:', error);
+
         throw new Error('Dosya boyutu hesaplanamadı.');
     }
 }
@@ -150,10 +163,46 @@ function sanitizeTableData(tableData) {
     return sanitized;
 }
 
+function getCacheKey(userId, key) {
+    return `${userId}_${key}`;
+}
+
+function getFromCache(userId, key) {
+    const cacheKey = getCacheKey(userId, key);
+    const cached = fileCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+        return cached.data;
+    }
+    
+    fileCache.delete(cacheKey);
+    return null;
+}
+
+function setCache(userId, key, data) {
+    const cacheKey = getCacheKey(userId, key);
+    fileCache.set(cacheKey, {
+        data: data,
+        timestamp: Date.now()
+    });
+    
+    if (fileCache.size > 100) {
+        const oldestKey = Array.from(fileCache.keys())[0];
+        fileCache.delete(oldestKey);
+    }
+}
+
+function clearUserCache(userId) {
+    const userPrefix = `${userId}_`;
+    for (const [key] of fileCache) {
+        if (key.startsWith(userPrefix)) {
+            fileCache.delete(key);
+        }
+    }
+}
+
 export async function saveUserTable(tableName, tableData) {
     try {
-        console.log('💾 Kullanıcı tablosu kaydediliyor:', tableName);
-        
         if (!auth.currentUser) {
             throw new Error('Kullanıcı giriş yapmamış');
         }
@@ -170,7 +219,8 @@ export async function saveUserTable(tableName, tableData) {
         
         const userFilesQuery = query(
             collection(db, 'userFiles'),
-            where('userId', '==', auth.currentUser.uid)
+            where('userId', '==', auth.currentUser.uid),
+            where('isActive', '==', true)
         );
         const userFiles = await getDocs(userFilesQuery);
         
@@ -203,11 +253,12 @@ export async function saveUserTable(tableName, tableData) {
 
         await setDoc(doc(db, 'userFiles', fileId), fileData);
         
-        console.log('✅ Tablo başarıyla kaydedildi:', tableName, `(${fileSize} KB)`);
+        clearUserCache(userId);
+        
         return fileId;
         
     } catch (error) {
-        console.error('❌ Tablo kaydetme hatası:', error);
+
         
         if (error.code === 'permission-denied') {
             throw new Error('Dosya kaydetme izni yok. Lütfen tekrar giriş yapın.');
@@ -223,19 +274,19 @@ export async function saveUserTable(tableName, tableData) {
 
 export async function getUserFiles() {
     try {
-        console.log('📁 Kullanıcı dosyaları yükleniyor...');
-        
         if (!auth.currentUser) {
             throw new Error('Kullanıcı giriş yapmamış');
         }
 
         const userId = auth.currentUser.uid;
         
+        const cached = getFromCache(userId, 'files');
+        if (cached && cached.length > 0) {
+            return cached;
+        }
         const q = query(
             collection(db, 'userFiles'),
             where('userId', '==', userId),
-            where('isActive', '==', true),
-            orderBy('updatedAt', 'desc'),
             limit(100)
         );
         
@@ -244,45 +295,66 @@ export async function getUserFiles() {
         
         querySnapshot.forEach((docSnapshot) => {
             const data = docSnapshot.data();
+            
+            if (data.isActive === false) {
+                return;
+            }
+            
             files.push({
                 id: docSnapshot.id,
-                name: data.name,
+                fileName: data.fileName || data.name || 'Adsız Dosya',
+                name: data.fileName || data.name || 'Adsız Dosya',
                 fileSize: data.fileSize || 0,
-                createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt),
-                updatedAt: data.updatedAt?.toDate?.() || new Date(data.updatedAt),
+                createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt || Date.now()),
+                updatedAt: data.updatedAt?.toDate?.() || new Date(data.updatedAt || Date.now()),
                 version: data.version || 1,
-                rowCount: data.data?.metadata?.rowCount || 0,
-                columnCount: data.data?.metadata?.columnCount || 0,
+                tableData: data.tableData || data.data,
+                rowCount: data.data?.metadata?.rowCount || data.tableData?.metadata?.rowCount || 0,
+                columnCount: data.data?.metadata?.columnCount || data.tableData?.metadata?.columnCount || 0,
                 description: data.description || '',
                 tags: data.tags || []
             });
         });
         
-        console.log('✅ Kullanıcı dosyaları yüklendi:', files.length, 'dosya');
+        files.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        
+        setCache(userId, 'files', files);
         return files;
         
     } catch (error) {
-        console.error('❌ Dosyalar yüklenirken hata:', error);
         
         if (error.code === 'permission-denied') {
             throw new Error('Dosyalara erişim izni yok. Lütfen tekrar giriş yapın.');
         } else if (error.code === 'unavailable') {
             throw new Error('Veritabanı geçici olarak kullanılamıyor. Lütfen tekrar deneyin.');
+        } else if (error.code === 'failed-precondition') {
+            throw new Error('Veritabanı bağlantı sorunu. Sayfayı yenileyin.');
         }
         
-        throw error;
+        throw new Error(`Dosyalar yüklenemedi: ${error.message}`);
     }
 }
 
 export async function loadUserFile(fileId) {
     try {
-        console.log('📂 Dosya yükleniyor:', fileId);
-        
         if (!auth.currentUser) {
             throw new Error('Kullanıcı giriş yapmamış');
         }
         
         checkRateLimit('LOAD_FILE');
+
+        const userId = auth.currentUser.uid;
+        const cached = getFromCache(userId, `file_${fileId}`);
+        if (cached) {
+            try {
+                await updateDoc(doc(db, 'userFiles', fileId), {
+                    lastAccessedAt: serverTimestamp()
+                });
+            } catch (updateError) {
+
+            }
+            return cached;
+        }
 
         const docRef = doc(db, 'userFiles', fileId);
         const docSnap = await getDoc(docRef);
@@ -304,11 +376,10 @@ export async function loadUserFile(fileId) {
         await updateDoc(docRef, {
             lastAccessedAt: serverTimestamp()
         }).catch(updateError => {
-            console.warn('⚠️ Son erişim zamanı güncellenemedi:', updateError);
+
         });
         
-        console.log('✅ Dosya yüklendi:', fileData.name);
-        return {
+        const result = {
             id: docSnap.id,
             name: fileData.name,
             data: fileData.data,
@@ -320,8 +391,11 @@ export async function loadUserFile(fileId) {
             tags: fileData.tags || []
         };
         
+        setCache(userId, `file_${fileId}`, result);
+        return result;
+        
     } catch (error) {
-        console.error('❌ Dosya yüklenirken hata:', error);
+
         
         if (error.code === 'permission-denied') {
             throw new Error('Dosyaya erişim izni yok. Lütfen tekrar giriş yapın.');
@@ -333,8 +407,6 @@ export async function loadUserFile(fileId) {
 
 export async function updateUserFile(fileId, tableName, tableData) {
     try {
-        console.log('🔄 Dosya güncelleniyor:', fileId);
-        
         if (!auth.currentUser) {
             throw new Error('Kullanıcı giriş yapmamış');
         }
@@ -376,10 +448,12 @@ export async function updateUserFile(fileId, tableName, tableData) {
         };
         
         await updateDoc(docRef, updateData);
-        console.log('✅ Dosya başarıyla güncellendi:', tableName, `(${fileSize} KB)`);
+        
+        const userId = auth.currentUser.uid;
+        clearUserCache(userId);
         
     } catch (error) {
-        console.error('❌ Dosya güncellenirken hata:', error);
+
         
         if (error.code === 'permission-denied') {
             throw new Error('Dosya güncelleme izni yok. Lütfen tekrar giriş yapın.');
@@ -391,8 +465,6 @@ export async function updateUserFile(fileId, tableName, tableData) {
 
 export async function deleteUserFile(fileId) {
     try {
-        console.log('🗑️ Dosya siliniyor:', fileId);
-        
         if (!auth.currentUser) {
             throw new Error('Kullanıcı giriş yapmamış');
         }
@@ -418,10 +490,11 @@ export async function deleteUserFile(fileId) {
             updatedAt: serverTimestamp()
         });
         
-        console.log('✅ Dosya başarıyla silindi (soft delete):', fileData.name);
+        const userId = auth.currentUser.uid;
+        clearUserCache(userId);
         
     } catch (error) {
-        console.error('❌ Dosya silinirken hata:', error);
+
         
         if (error.code === 'permission-denied') {
             throw new Error('Dosya silme izni yok. Lütfen tekrar giriş yapın.');
@@ -433,8 +506,6 @@ export async function deleteUserFile(fileId) {
 
 export async function permanentDeleteUserFile(fileId) {
     try {
-        console.log('💥 Dosya kalıcı olarak siliniyor:', fileId);
-        
         if (!auth.currentUser) {
             throw new Error('Kullanıcı giriş yapmamış');
         }
@@ -455,10 +526,12 @@ export async function permanentDeleteUserFile(fileId) {
         }
         
         await deleteDoc(docRef);
-        console.log('✅ Dosya kalıcı olarak silindi:', fileData.name);
+        
+        const userId = auth.currentUser.uid;
+        clearUserCache(userId);
         
     } catch (error) {
-        console.error('❌ Dosya kalıcı silme hatası:', error);
+
         
         if (error.code === 'permission-denied') {
             throw new Error('Dosya silme izni yok. Lütfen tekrar giriş yapın.');
@@ -470,8 +543,6 @@ export async function permanentDeleteUserFile(fileId) {
 
 export function serializeTableData() {
     try {
-        console.log('📊 Tablo verisi serialize ediliyor...');
-        
         const table = document.getElementById('dynamicTable');
         if (!table) {
             throw new Error('Tablo bulunamadı');
@@ -538,19 +609,16 @@ export function serializeTableData() {
             }
         };
         
-        console.log('✅ Tablo verisi serialize edildi:', tableData.metadata);
         return tableData;
         
     } catch (error) {
-        console.error('❌ Tablo serialize hatası:', error);
+
         throw error;
     }
 }
 
 export function deserializeTableData(tableData) {
     try {
-        console.log('📊 Tablo verisi deserialize ediliyor...');
-        
         if (!tableData || !tableData.headers || !tableData.rows) {
             throw new Error('Geçersiz tablo verisi');
         }
@@ -628,55 +696,99 @@ export function deserializeTableData(tableData) {
         if (window.updateColumnClickEvents) window.updateColumnClickEvents();
         if (window.updateRowNumbers) window.updateRowNumbers();
         if (window.clearSelection) window.clearSelection();
-
-        console.log('✅ Tablo verisi başarıyla yüklendi');
         
     } catch (error) {
-        console.error('❌ Tablo deserialize hatası:', error);
+
         throw error;
     }
 }
 
-let autoSaveInterval;
-let autoSaveEnabled = false;
-
 export function setupAutoSave(interval = 30000) {
     try {
         if (!auth.currentUser) {
-            console.warn('⚠️ Kullanıcı giriş yapmamış, otomatik kayıt başlatılamıyor');
+
             return false;
         }
         
         if (autoSaveEnabled) {
-            console.log('⚠️ Otomatik kayıt zaten aktif');
-            return true;
+            clearInterval(autoSaveInterval);
         }
 
         function performAutoSave() {
             try {
+                if (!auth.currentUser) {
+
+                    stopAutoSave();
+                    return;
+                }
+
+                if (!window.currentFileId) {
+                    const tableData = serializeTableData();
+                    if (tableData && tableData.rows && tableData.rows.length > 0) {
+                        const fileName = `Otomatik_Kayıt_${new Date().toISOString().slice(0, 16).replace('T', '_').replace(/:/g, '-')}`;
+                        
+                        pendingChanges.add('new_file');
+                        
+                        saveUserTable(fileName, tableData)
+                            .then((fileId) => {
+                                window.currentFileId = fileId;
+                                window.currentFileName = fileName;
+                                lastAutoSaveTime = new Date();
+                                pendingChanges.delete('new_file');
+                                
+                                if (window.updateSaveStatus) {
+                                    window.updateSaveStatus();
+                                }
+                                
+                                if (window.showNotification) {
+                                    window.showNotification(`Yeni dosya "${fileName}" oluşturuldu`, 'success');
+                                }
+                            })
+                            .catch(error => {
+
+                                pendingChanges.delete('new_file');
+                            });
+                    }
+                    return;
+                }
+
                 const tableData = serializeTableData();
-                if (tableData && tableData.rows.length > 0) {
-                    const autoSaveName = `Otomatik Kayıt - ${new Date().toLocaleString('tr-TR')}`;
-                    saveUserTable(autoSaveName, tableData).catch(error => {
-                        console.error('❌ Otomatik kayıt hatası:', error);
-                        if (error.message.includes('Çok fazla')) {
-                            console.log('⚠️ Rate limit nedeniyle otomatik kayıt atlandı');
-                        }
-                    });
+                if (tableData && tableData.rows && tableData.rows.length > 0) {
+                    pendingChanges.add('autosave');
+                    
+                    updateUserFile(window.currentFileId, window.currentFileName, tableData)
+                        .then(() => {
+                            lastAutoSaveTime = new Date();
+                            pendingChanges.delete('autosave');
+                            
+                            if (window.updateSaveStatus) {
+                                window.updateSaveStatus();
+                            }
+                        })
+                        .catch(error => {
+
+                            pendingChanges.delete('autosave');
+                            
+                            if (error.message.includes('Çok fazla')) {
+                    
+                            }
+                        });
                 }
             } catch (error) {
-                console.error('❌ Otomatik kayıt serialize hatası:', error);
+
+                pendingChanges.delete('autosave');
             }
         }
 
         autoSaveInterval = setInterval(performAutoSave, interval);
         autoSaveEnabled = true;
         
-        console.log('✅ Otomatik kayıt başlatıldı (30 saniye aralıklarla)');
+        setTimeout(performAutoSave, 1000);
+        
         return true;
         
     } catch (error) {
-        console.error('❌ Otomatik kayıt başlatma hatası:', error);
+
         return false;
     }
 }
@@ -686,7 +798,7 @@ export function stopAutoSave() {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
         autoSaveEnabled = false;
-        console.log('🛑 Otomatik kayıt durduruldu');
+        pendingChanges.clear();
         return true;
     }
     return false;
@@ -694,6 +806,15 @@ export function stopAutoSave() {
 
 export function isAutoSaveEnabled() {
     return autoSaveEnabled;
+}
+
+export function getAutoSaveStatus() {
+    return {
+        enabled: autoSaveEnabled,
+        lastSaveTime: lastAutoSaveTime,
+        hasPendingChanges: pendingChanges.size > 0,
+        pendingOperations: Array.from(pendingChanges)
+    };
 }
 
 export async function getUserFileStats() {
@@ -725,7 +846,7 @@ export async function getUserFileStats() {
         return stats;
         
     } catch (error) {
-        console.error('❌ Kullanıcı dosya istatistikleri hatası:', error);
+
         throw error;
     }
 }
@@ -749,11 +870,10 @@ export async function searchUserFiles(searchTerm) {
                    (file.tags && file.tags.some(tag => tag.toLowerCase().includes(searchTermLower)));
         });
         
-        console.log(`🔍 Arama sonucu: ${matchedFiles.length} dosya bulundu`);
         return matchedFiles;
         
     } catch (error) {
-        console.error('❌ Dosya arama hatası:', error);
+
         throw error;
     }
 }
@@ -768,12 +888,11 @@ export async function quickSaveCurrentTable(fileName = null) {
         const autoFileName = fileName || `Hızlı_Kayıt_${new Date().toISOString().slice(0, 16).replace('T', '_').replace(/:/g, '-')}`;
         
         const fileId = await saveUserTable(autoFileName, tableData);
-        console.log('✅ Hızlı kayıt tamamlandı:', autoFileName);
         
         return { fileId, fileName: autoFileName };
         
     } catch (error) {
-        console.error('❌ Hızlı kayıt hatası:', error);
+
         throw error;
     }
 }
@@ -808,7 +927,7 @@ export async function getRecentFiles(limit = 10) {
         return files;
         
     } catch (error) {
-        console.error('❌ Son dosyalar yüklenirken hata:', error);
+
         throw error;
     }
 }
@@ -823,12 +942,11 @@ export async function duplicateUserFile(fileId, newName = null) {
         const duplicateName = newName || `${originalFile.name}_Kopya`;
         
         const newFileId = await saveUserTable(duplicateName, originalFile.data);
-        console.log('✅ Dosya başarıyla kopyalandı:', duplicateName);
         
         return newFileId;
         
     } catch (error) {
-        console.error('❌ Dosya kopyalama hatası:', error);
+
         throw error;
     }
 }
@@ -851,7 +969,7 @@ export async function exportUserFileAsJSON(fileId) {
         return JSON.stringify(exportData, null, 2);
         
     } catch (error) {
-        console.error('❌ JSON export hatası:', error);
+
         throw error;
     }
 }
@@ -871,11 +989,10 @@ export async function importUserFileFromJSON(jsonString, fileName = null) {
         const importFileName = fileName || importData.name || 'İçe_Aktarılan_Dosya';
         const fileId = await saveUserTable(importFileName, importData.data);
         
-        console.log('✅ JSON dosyası başarıyla içe aktarıldı:', importFileName);
         return fileId;
         
     } catch (error) {
-        console.error('❌ JSON import hatası:', error);
+
         throw error;
     }
 }
@@ -930,7 +1047,7 @@ export async function getUserStorageInfo() {
         };
         
     } catch (error) {
-        console.error('❌ Depolama bilgisi hatası:', error);
+
         throw error;
     }
 }
@@ -974,15 +1091,132 @@ export async function cleanupOldAutoSaves(keepCount = 5) {
                 await deleteUserFile(file.id);
             }
             
-            console.log(`✅ ${filesToDelete.length} eski otomatik kayıt temizlendi`);
             return filesToDelete.length;
         }
         
         return 0;
         
     } catch (error) {
-        console.error('❌ Otomatik kayıt temizleme hatası:', error);
+
         throw error;
+    }
+}
+
+export async function batchDeleteFiles(fileIds) {
+    try {
+        if (!auth.currentUser) {
+            throw new Error('Kullanıcı giriş yapmamış');
+        }
+        
+        if (!Array.isArray(fileIds) || fileIds.length === 0) {
+            throw new Error('Geçersiz dosya listesi');
+        }
+        
+        if (fileIds.length > MAX_BATCH_SIZE) {
+            throw new Error(`En fazla ${MAX_BATCH_SIZE} dosya aynı anda silinebilir`);
+        }
+        
+        const batch = writeBatch(db);
+        
+        for (const fileId of fileIds) {
+            const docRef = doc(db, 'userFiles', fileId);
+            batch.update(docRef, {
+                isActive: false,
+                deletedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+        }
+        
+        await batch.commit();
+        
+        const userId = auth.currentUser.uid;
+        clearUserCache(userId);
+        
+        return fileIds.length;
+        
+    } catch (error) {
+
+        throw error;
+    }
+}
+
+export async function syncOfflineChanges() {
+    try {
+        if (!auth.currentUser) {
+            throw new Error('Kullanıcı giriş yapmamış');
+        }
+        
+        const offlineChanges = localStorage.getItem('tabledit_offline_changes');
+        if (!offlineChanges) {
+            return 0;
+        }
+        
+        const changes = JSON.parse(offlineChanges);
+        let syncedCount = 0;
+        
+        for (const change of changes) {
+            try {
+                switch (change.type) {
+                    case 'save':
+                        await saveUserTable(change.fileName, change.data);
+                        break;
+                    case 'update':
+                        await updateUserFile(change.fileId, change.fileName, change.data);
+                        break;
+                    case 'delete':
+                        await deleteUserFile(change.fileId);
+                        break;
+                }
+                syncedCount++;
+            } catch (error) {
+
+            }
+        }
+        
+        localStorage.removeItem('tabledit_offline_changes');
+        return syncedCount;
+        
+    } catch (error) {
+
+        throw error;
+    }
+}
+
+function addOfflineChange(change) {
+    try {
+        const existing = localStorage.getItem('tabledit_offline_changes');
+        const changes = existing ? JSON.parse(existing) : [];
+        
+        changes.push({
+            ...change,
+            timestamp: Date.now()
+        });
+        
+        if (changes.length > 100) {
+            changes.splice(0, 50);
+        }
+        
+        localStorage.setItem('tabledit_offline_changes', JSON.stringify(changes));
+    } catch (error) {
+
+    }
+}
+
+export function initializeOfflineSupport() {
+    if (typeof window !== 'undefined') {
+        window.addEventListener('online', () => {
+            if (auth.currentUser) {
+                syncOfflineChanges().catch(() => {});
+            }
+        });
+        
+        window.addEventListener('offline', () => {});
+        
+        if (navigator.onLine && auth.currentUser) {
+            setTimeout(() => {
+                syncOfflineChanges().catch(() => {});
+            }, 2000);
+        }
     }
 }
 
@@ -999,6 +1233,7 @@ if (typeof window !== 'undefined') {
         setupAutoSave,
         stopAutoSave,
         isAutoSaveEnabled,
+        getAutoSaveStatus,
         getUserFileStats,
         searchUserFiles,
         calculateFileSize,
@@ -1010,10 +1245,18 @@ if (typeof window !== 'undefined') {
         importUserFileFromJSON,
         validateTableData,
         getUserStorageInfo,
-        cleanupOldAutoSaves
+        cleanupOldAutoSaves,
+        batchDeleteFiles,
+        syncOfflineChanges
     };
     
     window.addEventListener('beforeunload', () => {
         stopAutoSave();
+    });
+    
+    window.addEventListener('online', () => {
+        if (auth.currentUser) {
+
+        }
     });
 }

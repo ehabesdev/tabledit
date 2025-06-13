@@ -16,13 +16,11 @@ let auth;
 let db;
 
 try {
-  console.log('🔥 Firebase başlatılıyor...');
   app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  console.log('✅ Firebase başarıyla başlatıldı!');
+auth = getAuth(app);
+db = getFirestore(app);
 } catch (error) {
-  console.error('❌ Firebase başlatma hatası:', error);
+
   throw error;
 }
 
@@ -44,9 +42,7 @@ const checkFirebaseConnection = async () => {
   try {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       connectionStatus = 'connected';
-      console.log('🔥 Firebase Auth bağlantısı aktif');
-      if (user) {
-        console.log('👤 Kullanıcı oturumu bulundu:', user.email);
+              if (user) {
       }
       unsubscribe();
     });
@@ -54,25 +50,25 @@ const checkFirebaseConnection = async () => {
     setTimeout(() => {
       if (connectionStatus === 'checking') {
         connectionStatus = 'timeout';
-        console.warn('⏰ Firebase bağlantısı zaman aşımına uğradı');
+
       }
     }, 10000);
     
   } catch (error) {
     connectionStatus = 'error';
-    console.error('❌ Firebase bağlantı kontrolü hatası:', error);
+
   }
 };
 
 window.addEventListener('online', () => {
   isOnline = true;
-  console.log('🌐 İnternet bağlantısı restored');
+
   checkFirebaseConnection();
 });
 
 window.addEventListener('offline', () => {
   isOnline = false;
-  console.log('📴 İnternet bağlantısı kesildi');
+
 });
 
 export const getConnectionStatus = () => ({
@@ -107,7 +103,7 @@ window.addEventListener('unhandledrejection', event => {
     });
     
     if (userMessage && !event.reason.handled) {
-      console.log('📢 Kullanıcı hata mesajı:', userMessage);
+
       event.reason.handled = true;
     }
   }
@@ -115,16 +111,10 @@ window.addEventListener('unhandledrejection', event => {
 
 auth.onAuthStateChanged((user) => {
   if (user && !user.emailVerified) {
-    console.log('⚠️ E-posta doğrulanmamış kullanıcı:', user.email);
+
   }
 });
 
 checkFirebaseConnection();
-
-console.log('🔥 Firebase Config tamamen yüklendi!');
-console.log('📊 Proje bilgileri:');
-console.log('  📧 Auth Domain:', firebaseConfig.authDomain);
-console.log('  🗂️ Project ID:', firebaseConfig.projectId);
-console.log('  🔒 Güvenlik: Production modu aktif');
 
 export { auth, db, securityConfig };
