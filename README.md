@@ -1,4 +1,4 @@
-# 🚀 **Tabledit** - Profesyonel Tablo Editörü
+# 🚀 **Tabledit**
 
 <div align="center">
 
